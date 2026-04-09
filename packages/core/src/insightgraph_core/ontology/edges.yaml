@@ -1,0 +1,50 @@
+edges:
+  # Document structure edges
+  HAS_SECTION:
+    from: [Report]
+    to: [Section]
+  HAS_PARAGRAPH:
+    from: [Section]
+    to: [Paragraph]
+  PART_OF:
+    from: [Section]
+    to: [Section]
+  HAS_SPAN:
+    from: [Paragraph]
+    to: [SourceSpan]
+
+  # Semantic relation edges
+  MENTIONS:
+    from: [Paragraph, Claim]
+    to: [Entity]
+  ASSERTS:
+    from: [Paragraph]
+    to: [Claim]
+  MEASURES:
+    from: [MetricValue]
+    to: [Metric]
+  HAS_VALUE:
+    from: [Entity]
+    to: [MetricValue]
+  REFERS_TO_PERIOD:
+    from: [MetricValue, Claim]
+    to: [TimePeriod]
+  ABOUT:
+    from: [Claim]
+    to: [Entity]
+
+  # Evidence relation edges
+  SUPPORTED_BY:
+    from: [Claim, MetricValue]
+    to: [SourceSpan]
+  DERIVED_FROM:
+    from: [MetricValue]
+    to: [SourceSpan]
+  SOURCED_FROM:
+    from: [Entity]
+    to: [Report]
+
+  # Entity resolution edge
+  SAME_AS:
+    from: [Entity]
+    to: [Entity]
