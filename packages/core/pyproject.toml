@@ -1,0 +1,17 @@
+[project]
+name = "insightgraph-core"
+version = "0.1.0"
+description = "Core types, config, Document IR, and ontology for InsightGraph"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.5",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/insightgraph_core"]
