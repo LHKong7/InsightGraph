@@ -2,6 +2,7 @@ from insightgraph_core.ir.extraction import (
     ExtractedClaim,
     ExtractedEntity,
     ExtractedMetric,
+    ExtractedRelationship,
     ExtractionResult,
     ResolvedEntity,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "ExtractedClaim",
     "ExtractedEntity",
     "ExtractedMetric",
+    "ExtractedRelationship",
     "ResolvedEntity",
     "SectionNode",
     "SourceSpan",

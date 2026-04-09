@@ -5,6 +5,7 @@ from insightgraph_extractor.claim import ClaimExtractor
 from insightgraph_extractor.entity import EntityExtractor
 from insightgraph_extractor.metric import MetricExtractor
 from insightgraph_extractor.pipeline import ExtractionPipeline
+from insightgraph_extractor.relationship import RelationshipExtractor
 
 __all__ = [
     "BaseExtractor",
@@ -12,4 +13,5 @@ __all__ = [
     "EntityExtractor",
     "ExtractionPipeline",
     "MetricExtractor",
+    "RelationshipExtractor",
 ]

@@ -40,6 +40,18 @@ class ExtractedClaim(BaseModel):
     source_text: str = ""
 
 
+class ExtractedRelationship(BaseModel):
+    """A relationship between two entities extracted from a document block."""
+
+    source_entity: str
+    target_entity: str
+    relationship_type: str
+    description: str
+    confidence: float = 0.8
+    source_block_id: UUID
+    source_text: str = ""
+
+
 class ResolvedEntity(BaseModel):
     """An entity after resolution with canonical name and aliases."""
 
@@ -57,4 +69,5 @@ class ExtractionResult(BaseModel):
     entities: list[ExtractedEntity] = Field(default_factory=list)
     metrics: list[ExtractedMetric] = Field(default_factory=list)
     claims: list[ExtractedClaim] = Field(default_factory=list)
+    relationships: list[ExtractedRelationship] = Field(default_factory=list)
     resolved_entities: list[ResolvedEntity] = Field(default_factory=list)

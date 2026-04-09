@@ -15,6 +15,27 @@ from insightgraph_graph.connection import Neo4jConnection
 
 logger = logging.getLogger(__name__)
 
+# Allowed relationship type labels.  Only these will be written as typed edges
+# in Neo4j.  Using string formatting for the relationship type is safe because
+# the value is validated against this fixed set before being interpolated.
+_VALID_RELATIONSHIP_TYPES = frozenset(
+    {
+        "SUBSIDIARY_OF",
+        "CEO_OF",
+        "FOUNDER_OF",
+        "BOARD_MEMBER_OF",
+        "COMPETES_WITH",
+        "PARTNERS_WITH",
+        "INVESTED_IN",
+        "SUPPLIES_TO",
+        "ACQUIRED",
+        "MERGED_WITH",
+        "REGULATES",
+        "OPERATES_IN",
+        "EMPLOYS",
+    }
+)
+
 
 class GraphWriter:
     """Writes a fully-parsed document and its extractions into Neo4j."""
@@ -56,6 +77,7 @@ class GraphWriter:
             "metrics": 0,
             "metric_values": 0,
             "claims": 0,
+            "relationships": 0,
             "edges": 0,
         }
 
@@ -387,6 +409,51 @@ class GraphWriter:
                     entity_type=entity_type,
                 )
                 counts["edges"] += 1
+
+        # --- Relationships ---------------------------------------------------
+        for rel in extractions.relationships:
+            rel_type = rel.relationship_type.strip().upper()
+            if rel_type not in _VALID_RELATIONSHIP_TYPES:
+                logger.warning(
+                    "Skipping unknown relationship type %r for %s -> %s",
+                    rel_type,
+                    rel.source_entity,
+                    rel.target_entity,
+                )
+                continue
+
+            # Resolve source and target entity names through the resolved map.
+            source_resolved = resolved_map.get(rel.source_entity.lower())
+            source_canonical = (
+                source_resolved.canonical_name if source_resolved else rel.source_entity
+            )
+            target_resolved = resolved_map.get(rel.target_entity.lower())
+            target_canonical = (
+                target_resolved.canonical_name if target_resolved else rel.target_entity
+            )
+
+            # Use string formatting for the relationship type label.  This is
+            # safe because rel_type has been validated against the fixed
+            # _VALID_RELATIONSHIP_TYPES set above.
+            await tx.run(
+                f"MATCH (source:Entity) "
+                f"WHERE source.canonical_name = $source_name "
+                f"   OR source.name = $source_name "
+                f"MATCH (target:Entity) "
+                f"WHERE target.canonical_name = $target_name "
+                f"   OR target.name = $target_name "
+                f"MERGE (source)-[r:{rel_type}]->(target) "
+                f"SET r.description = $description, "
+                f"    r.confidence = $confidence, "
+                f"    r.source_text = $source_text",
+                source_name=source_canonical,
+                target_name=target_canonical,
+                description=rel.description,
+                confidence=rel.confidence,
+                source_text=rel.source_text,
+            )
+            counts["relationships"] += 1
+            counts["edges"] += 1
 
         logger.info(
             "Document %s written: %s",

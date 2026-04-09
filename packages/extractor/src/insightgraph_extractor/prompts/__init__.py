@@ -15,6 +15,11 @@ from insightgraph_extractor.prompts.metric import (
     METRIC_USER_TEMPLATE,
     format_metric_prompt,
 )
+from insightgraph_extractor.prompts.relationship import (
+    RELATIONSHIP_SYSTEM_PROMPT,
+    RELATIONSHIP_USER_TEMPLATE,
+    format_relationship_prompt,
+)
 
 __all__ = [
     "CLAIM_SYSTEM_PROMPT",
@@ -23,7 +28,10 @@ __all__ = [
     "ENTITY_USER_TEMPLATE",
     "METRIC_SYSTEM_PROMPT",
     "METRIC_USER_TEMPLATE",
+    "RELATIONSHIP_SYSTEM_PROMPT",
+    "RELATIONSHIP_USER_TEMPLATE",
     "format_claim_prompt",
     "format_entity_prompt",
     "format_metric_prompt",
+    "format_relationship_prompt",
 ]

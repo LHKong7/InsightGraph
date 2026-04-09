@@ -7,6 +7,7 @@ from insightgraph_core.ir.extraction import (
     ExtractedClaim,
     ExtractedEntity,
     ExtractedMetric,
+    ExtractedRelationship,
     ExtractionResult,
 )
 from insightgraph_core.ir.models import Block, DocumentIR
@@ -14,6 +15,7 @@ from insightgraph_core.types import BlockType
 from insightgraph_extractor.claim import ClaimExtractor
 from insightgraph_extractor.entity import EntityExtractor
 from insightgraph_extractor.metric import MetricExtractor
+from insightgraph_extractor.relationship import RelationshipExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +25,12 @@ _TEXT_BLOCK_TYPES = {BlockType.PARAGRAPH, BlockType.HEADING}
 
 
 class ExtractionPipeline:
-    """Orchestrates entity, metric, and claim extraction over a DocumentIR.
+    """Orchestrates entity, metric, claim, and relationship extraction over a
+    DocumentIR.
 
-    All three extractors run concurrently via ``asyncio.gather``.
+    Entity, metric, and claim extractors run concurrently in step 1.
+    Relationship extraction runs in step 2 after entities are available, since
+    it requires the list of extracted entity names as context.
     """
 
     def __init__(
@@ -36,6 +41,7 @@ class ExtractionPipeline:
         self.entity_extractor = EntityExtractor(model=model, api_key=api_key)
         self.metric_extractor = MetricExtractor(model=model, api_key=api_key)
         self.claim_extractor = ClaimExtractor(model=model, api_key=api_key)
+        self.relationship_extractor = RelationshipExtractor(model=model, api_key=api_key)
 
     async def extract(self, doc: DocumentIR) -> ExtractionResult:
         """Run the full extraction pipeline on a parsed document.
@@ -45,7 +51,7 @@ class ExtractionPipeline:
 
         Returns:
             An ``ExtractionResult`` containing all extracted entities, metrics,
-            and claims.
+            claims, and relationships.
         """
         all_blocks: list[Block] = list(doc.iter_all_blocks())
         text_blocks: list[Block] = [b for b in all_blocks if b.type in _TEXT_BLOCK_TYPES]
@@ -59,6 +65,7 @@ class ExtractionPipeline:
             len(text_blocks),
         )
 
+        # Step 1: Extract entities, metrics, and claims concurrently.
         results = await asyncio.gather(
             self.entity_extractor.extract(text_blocks, context),
             self.metric_extractor.extract(all_blocks, context),
@@ -82,12 +89,29 @@ class ExtractionPipeline:
             else:
                 claims = result
 
+        # Step 2: Extract relationships using entity names as context.
+        relationships: list[ExtractedRelationship] = []
+        if entities:
+            entity_names = list({e.name for e in entities})
+            relationship_context = {
+                **context,
+                "entities": entity_names,
+            }
+            try:
+                relationships = await self.relationship_extractor.extract(
+                    text_blocks, relationship_context
+                )
+            except Exception as exc:
+                logger.error("Relationship extractor failed: %s", exc)
+
         logger.info(
-            "Extraction complete for document %s: %d entities, %d metrics, %d claims",
+            "Extraction complete for document %s: "
+            "%d entities, %d metrics, %d claims, %d relationships",
             doc.id,
             len(entities),
             len(metrics),
             len(claims),
+            len(relationships),
         )
 
         return ExtractionResult(
@@ -95,4 +119,5 @@ class ExtractionPipeline:
             entities=entities,
             metrics=metrics,
             claims=claims,
+            relationships=relationships,
         )
