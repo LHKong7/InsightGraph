@@ -7,7 +7,6 @@ from collections import defaultdict
 import litellm
 
 from insightgraph_core.ir.extraction import ExtractedEntity, ResolvedEntity
-from insightgraph_core.types import EntityType
 
 logger = logging.getLogger(__name__)
 
@@ -129,10 +128,7 @@ class EntityResolver:
                     for e in original_groups[norm]:
                         all_block_ids.append(e.source_block_id)
 
-            try:
-                entity_type = EntityType(group.get("type", "OTHER"))
-            except ValueError:
-                entity_type = EntityType.OTHER
+            entity_type = group.get("type", "OTHER")
 
             resolved.append(
                 ResolvedEntity(

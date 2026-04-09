@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-SUPPORTED_FORMATS = {"pdf", "docx", "html", "md", "txt"}
+SUPPORTED_FORMATS = {"pdf", "docx", "html", "md", "txt", "csv", "json"}
 
 # Magic bytes for format detection
 _MAGIC_BYTES = {

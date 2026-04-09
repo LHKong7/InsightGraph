@@ -13,7 +13,6 @@ from insightgraph_core.ir.models import Block
 from insightgraph_extractor.base import BaseExtractor
 from insightgraph_extractor.prompts.relationship import (
     RELATIONSHIP_SYSTEM_PROMPT,
-    RELATIONSHIP_TYPES_LIST,
     format_relationship_prompt,
 )
 
@@ -21,9 +20,7 @@ logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 5
 _MAX_CONCURRENCY = 4
-
-# Valid relationship type values for fast lookup.
-_VALID_RELATIONSHIP_TYPES = set(RELATIONSHIP_TYPES_LIST)
+_REL_TYPE_PATTERN = __import__("re").compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 def _parse_relationships(
@@ -80,10 +77,10 @@ def _parse_relationships(
         if source_entity.lower() == target_entity.lower():
             continue
 
-        relationship_type = (item.get("relationship_type") or "").strip().upper()
-        if relationship_type not in _VALID_RELATIONSHIP_TYPES:
+        relationship_type = (item.get("relationship_type") or "").strip().upper().replace(" ", "_")
+        if not _REL_TYPE_PATTERN.match(relationship_type):
             logger.debug(
-                "Skipping relationship with invalid type: %s",
+                "Skipping relationship with invalid type format: %s",
                 relationship_type,
             )
             continue

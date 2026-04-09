@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     extraction_batch_size: int = 5
     extraction_max_concurrency: int = 5
 
+    # Domain
+    domain: str = "default"
+
     model_config = {"env_prefix": "IG_"}
 
 

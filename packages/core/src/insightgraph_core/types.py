@@ -1,14 +1,21 @@
 from enum import StrEnum
 
+# --- Built-in entity types (extensible via ontology) ---
+# These are defaults; users can use ANY string as entity_type.
+# The system treats entity_type as a free-form string, not a closed enum.
 
-class EntityType(StrEnum):
-    ORGANIZATION = "ORGANIZATION"
-    PERSON = "PERSON"
-    LOCATION = "LOCATION"
-    PRODUCT = "PRODUCT"
-    INDUSTRY = "INDUSTRY"
-    EVENT = "EVENT"
-    OTHER = "OTHER"
+BUILTIN_ENTITY_TYPES = [
+    "ORGANIZATION",
+    "PERSON",
+    "LOCATION",
+    "PRODUCT",
+    "INDUSTRY",
+    "EVENT",
+    "STOCK",
+    "DISH",
+    "METRIC_INDICATOR",
+    "OTHER",
+]
 
 
 class ClaimType(StrEnum):
@@ -17,6 +24,7 @@ class ClaimType(StrEnum):
     PREDICTION = "PREDICTION"
     COMPARISON = "COMPARISON"
     RECOMMENDATION = "RECOMMENDATION"
+    CAUSAL = "CAUSAL"
 
 
 class MetricDomain(StrEnum):
@@ -46,3 +54,4 @@ class BlockType(StrEnum):
     FOOTNOTE = "footnote"
     HEADER = "header"
     FOOTER = "footer"
+    DATA_ROW = "data_row"

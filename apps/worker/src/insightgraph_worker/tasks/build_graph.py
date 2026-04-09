@@ -32,10 +32,16 @@ async def _build_graph_async(doc_ir_data: dict, report_id: str) -> dict:
     settings = get_settings()
     doc = DocumentIR.model_validate(doc_ir_data)
 
+    # Load domain config
+    from insightgraph_core.domain import load_domain_config
+
+    domain_config = load_domain_config(settings.domain)
+
     # Extract
     pipeline = ExtractionPipeline(
         model=settings.llm_model,
         api_key=settings.llm_api_key,
+        domain_config=domain_config,
     )
     extractions = await pipeline.extract(doc)
 

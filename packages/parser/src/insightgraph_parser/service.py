@@ -4,6 +4,8 @@ from pathlib import Path
 
 from insightgraph_core.ir.models import DocumentIR
 from insightgraph_parser.base import BaseParser
+from insightgraph_parser.csv_parser import CSVParser
+from insightgraph_parser.json_parser import JSONParser
 from insightgraph_parser.pdf import PyMuPDFParser
 
 
@@ -16,7 +18,11 @@ class ParserService:
     """
 
     def __init__(self, parsers: dict[str, BaseParser] | None = None) -> None:
-        self._parsers: dict[str, BaseParser] = parsers or {"pdf": PyMuPDFParser()}
+        self._parsers: dict[str, BaseParser] = parsers or {
+            "pdf": PyMuPDFParser(),
+            "csv": CSVParser(),
+            "json": JSONParser(),
+        }
 
     # ------------------------------------------------------------------
     # Public API

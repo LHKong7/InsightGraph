@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -15,26 +16,9 @@ from insightgraph_graph.connection import Neo4jConnection
 
 logger = logging.getLogger(__name__)
 
-# Allowed relationship type labels.  Only these will be written as typed edges
-# in Neo4j.  Using string formatting for the relationship type is safe because
-# the value is validated against this fixed set before being interpolated.
-_VALID_RELATIONSHIP_TYPES = frozenset(
-    {
-        "SUBSIDIARY_OF",
-        "CEO_OF",
-        "FOUNDER_OF",
-        "BOARD_MEMBER_OF",
-        "COMPETES_WITH",
-        "PARTNERS_WITH",
-        "INVESTED_IN",
-        "SUPPLIES_TO",
-        "ACQUIRED",
-        "MERGED_WITH",
-        "REGULATES",
-        "OPERATES_IN",
-        "EMPLOYS",
-    }
-)
+# Regex pattern for validating relationship type labels.
+# Only uppercase letters, digits and underscores are allowed to prevent injection.
+_REL_TYPE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 class GraphWriter:
@@ -196,10 +180,10 @@ class GraphWriter:
 
         # --- Build resolved-entity lookup ---------------------------------
         resolved_map: dict[str, ResolvedEntity] = {}
-        for re in extractions.resolved_entities:
-            resolved_map[re.canonical_name.lower()] = re
-            for alias in re.aliases:
-                resolved_map[alias.lower()] = re
+        for resolved in extractions.resolved_entities:
+            resolved_map[resolved.canonical_name.lower()] = resolved
+            for alias in resolved.aliases:
+                resolved_map[alias.lower()] = resolved
 
         # --- Entities (MERGE on canonical_name + entity_type) -------------
         entity_node_map: dict[str, str] = {}  # canonical_name_lower -> entity_id
@@ -412,10 +396,10 @@ class GraphWriter:
 
         # --- Relationships ---------------------------------------------------
         for rel in extractions.relationships:
-            rel_type = rel.relationship_type.strip().upper()
-            if rel_type not in _VALID_RELATIONSHIP_TYPES:
+            rel_type = rel.relationship_type.strip().upper().replace(" ", "_")
+            if not _REL_TYPE_PATTERN.match(rel_type):
                 logger.warning(
-                    "Skipping unknown relationship type %r for %s -> %s",
+                    "Skipping invalid relationship type %r for %s -> %s",
                     rel_type,
                     rel.source_entity,
                     rel.target_entity,
@@ -433,8 +417,7 @@ class GraphWriter:
             )
 
             # Use string formatting for the relationship type label.  This is
-            # safe because rel_type has been validated against the fixed
-            # _VALID_RELATIONSHIP_TYPES set above.
+            # safe because rel_type has been validated via _REL_TYPE_PATTERN.
             await tx.run(
                 f"MATCH (source:Entity) "
                 f"WHERE source.canonical_name = $source_name "

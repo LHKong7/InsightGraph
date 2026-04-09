@@ -1,16 +1,16 @@
 from insightgraph_core.config import Settings, get_settings
 from insightgraph_core.types import (
+    BUILTIN_ENTITY_TYPES,
     BlockType,
     ClaimType,
-    EntityType,
     IngestionStatus,
     MetricDomain,
 )
 
 __all__ = [
+    "BUILTIN_ENTITY_TYPES",
     "BlockType",
     "ClaimType",
-    "EntityType",
     "IngestionStatus",
     "MetricDomain",
     "Settings",
