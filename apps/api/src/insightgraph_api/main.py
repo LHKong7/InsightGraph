@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from insightgraph_api.dependencies import get_cached_settings, get_ontology
-from insightgraph_api.routes import agent, health, ingestion, query
+from insightgraph_api.routes import agent, health, ingestion, query, search
 from insightgraph_graph.connection import Neo4jConnection
 from insightgraph_graph.schema import ensure_schema
 
@@ -62,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(ingestion.router)
     app.include_router(query.router)
     app.include_router(agent.router)
+    app.include_router(search.router)
 
     return app
 

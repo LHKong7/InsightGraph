@@ -37,16 +37,24 @@ class Planner:
         self.model = model
         self.api_key = api_key
 
-    async def plan(self, question: str) -> dict:
+    async def plan(self, question: str, context: str = "") -> dict:
         """Generate an execution plan for a question.
+
+        Args:
+            question: The user's question.
+            context: Optional conversation context from a session.
 
         Returns a dict with question_type, tool_plan, and reasoning.
         """
+        user_content = question
+        if context:
+            user_content = f"{context}\n\nNew question: {question}"
+
         kwargs: dict = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
-                {"role": "user", "content": question},
+                {"role": "user", "content": user_content},
             ],
             "response_format": {"type": "json_object"},
             "temperature": 0.0,

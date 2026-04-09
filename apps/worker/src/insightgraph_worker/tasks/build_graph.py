@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(bind=True, name="insightgraph.build_graph")
 def build_graph(self, doc_ir_data: dict, report_id: str) -> dict:
-    """Run extraction, resolution, and graph writing pipeline.
+    """Run extraction, resolution, graph writing, and embedding pipeline.
 
     Expects the serialized DocumentIR dict from the parse task.
     Returns a summary of what was written.
@@ -24,8 +24,10 @@ async def _build_graph_async(doc_ir_data: dict, report_id: str) -> dict:
     from insightgraph_core.ir.models import DocumentIR
     from insightgraph_extractor.pipeline import ExtractionPipeline
     from insightgraph_graph.connection import Neo4jConnection
+    from insightgraph_graph.embedding_writer import EmbeddingWriter
     from insightgraph_graph.writer import GraphWriter
     from insightgraph_resolver.service import ResolverService
+    from insightgraph_retriever.embeddings import EmbeddingService
 
     settings = get_settings()
     doc = DocumentIR.model_validate(doc_ir_data)
@@ -53,6 +55,17 @@ async def _build_graph_async(doc_ir_data: dict, report_id: str) -> dict:
     try:
         writer = GraphWriter(conn)
         result = await writer.write_document(doc, extractions)
+
+        # Generate and store embeddings
+        if settings.llm_api_key:
+            embedding_service = EmbeddingService(
+                model=settings.embedding_model,
+                api_key=settings.llm_api_key,
+            )
+            embedding_writer = EmbeddingWriter(conn, embedding_service)
+            embed_result = await embedding_writer.embed_all(report_id)
+            result.update(embed_result)
+
         return result
     finally:
         await conn.close()

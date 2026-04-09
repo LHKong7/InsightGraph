@@ -7,11 +7,13 @@ license = "MIT"
 dependencies = [
     "insightgraph-api",
     "insightgraph-worker",
+    "insightgraph-mcp-server",
 ]
 
 [tool.uv.sources]
 insightgraph-api = { workspace = true }
 insightgraph-worker = { workspace = true }
+insightgraph-mcp-server = { workspace = true }
 
 [tool.uv.workspace]
 members = [
