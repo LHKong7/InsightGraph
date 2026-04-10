@@ -25,8 +25,13 @@ nodes:
       paragraph_id: {type: string, required: true}
       text: {type: string, required: true}
       page: {type: integer}
+      embedding: {type: list}
     constraints:
       - unique: [paragraph_id]
+    vector_indexes:
+      - property: embedding
+        dimensions: 1536
+        similarity: cosine
 
   Entity:
     properties:
@@ -67,10 +72,15 @@ nodes:
       claim_type: {type: string}
       confidence: {type: float}
       polarity: {type: string}
+      embedding: {type: list}
     constraints:
       - unique: [claim_id]
     indexes:
       - fulltext: [text]
+    vector_indexes:
+      - property: embedding
+        dimensions: 1536
+        similarity: cosine
 
   SourceSpan:
     properties:

@@ -11,7 +11,7 @@ from insightgraph_core.ir.extraction import (
     ExtractionResult,
 )
 from insightgraph_core.ir.models import Block, DocumentIR, SectionNode, SourceSpan
-from insightgraph_core.types import BlockType, ClaimType, EntityType
+from insightgraph_core.types import BlockType, ClaimType
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def sample_extraction_result(sample_block: Block) -> ExtractionResult:
         entities=[
             ExtractedEntity(
                 name="NVIDIA",
-                type=EntityType.ORGANIZATION,
+                type="ORGANIZATION",
                 description="Semiconductor company",
                 source_block_id=block_id,
                 source_text="NVIDIA",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -14,6 +15,10 @@ from insightgraph_core.ir.models import DocumentIR, SectionNode, TableBlock
 from insightgraph_graph.connection import Neo4jConnection
 
 logger = logging.getLogger(__name__)
+
+# Regex pattern for validating relationship type labels.
+# Only uppercase letters, digits and underscores are allowed to prevent injection.
+_REL_TYPE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 class GraphWriter:
@@ -56,6 +61,7 @@ class GraphWriter:
             "metrics": 0,
             "metric_values": 0,
             "claims": 0,
+            "relationships": 0,
             "edges": 0,
         }
 
@@ -174,10 +180,10 @@ class GraphWriter:
 
         # --- Build resolved-entity lookup ---------------------------------
         resolved_map: dict[str, ResolvedEntity] = {}
-        for re in extractions.resolved_entities:
-            resolved_map[re.canonical_name.lower()] = re
-            for alias in re.aliases:
-                resolved_map[alias.lower()] = re
+        for resolved in extractions.resolved_entities:
+            resolved_map[resolved.canonical_name.lower()] = resolved
+            for alias in resolved.aliases:
+                resolved_map[alias.lower()] = resolved
 
         # --- Entities (MERGE on canonical_name + entity_type) -------------
         entity_node_map: dict[str, str] = {}  # canonical_name_lower -> entity_id
@@ -387,6 +393,50 @@ class GraphWriter:
                     entity_type=entity_type,
                 )
                 counts["edges"] += 1
+
+        # --- Relationships ---------------------------------------------------
+        for rel in extractions.relationships:
+            rel_type = rel.relationship_type.strip().upper().replace(" ", "_")
+            if not _REL_TYPE_PATTERN.match(rel_type):
+                logger.warning(
+                    "Skipping invalid relationship type %r for %s -> %s",
+                    rel_type,
+                    rel.source_entity,
+                    rel.target_entity,
+                )
+                continue
+
+            # Resolve source and target entity names through the resolved map.
+            source_resolved = resolved_map.get(rel.source_entity.lower())
+            source_canonical = (
+                source_resolved.canonical_name if source_resolved else rel.source_entity
+            )
+            target_resolved = resolved_map.get(rel.target_entity.lower())
+            target_canonical = (
+                target_resolved.canonical_name if target_resolved else rel.target_entity
+            )
+
+            # Use string formatting for the relationship type label.  This is
+            # safe because rel_type has been validated via _REL_TYPE_PATTERN.
+            await tx.run(
+                f"MATCH (source:Entity) "
+                f"WHERE source.canonical_name = $source_name "
+                f"   OR source.name = $source_name "
+                f"MATCH (target:Entity) "
+                f"WHERE target.canonical_name = $target_name "
+                f"   OR target.name = $target_name "
+                f"MERGE (source)-[r:{rel_type}]->(target) "
+                f"SET r.description = $description, "
+                f"    r.confidence = $confidence, "
+                f"    r.source_text = $source_text",
+                source_name=source_canonical,
+                target_name=target_canonical,
+                description=rel.description,
+                confidence=rel.confidence,
+                source_text=rel.source_text,
+            )
+            counts["relationships"] += 1
+            counts["edges"] += 1
 
         logger.info(
             "Document %s written: %s",

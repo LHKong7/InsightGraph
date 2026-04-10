@@ -11,6 +11,7 @@ from insightgraph_core.ontology.schema import (
     NodeTypeDef,
     Ontology,
     PropertyDef,
+    VectorIndexDef,
 )
 
 _ONTOLOGY_DIR = Path(__file__).parent
@@ -29,11 +30,16 @@ def _parse_node(name: str, raw: dict) -> NodeTypeDef:
     for idx in raw.get("indexes", []):
         indexes.append(IndexDef(**idx))
 
+    vector_indexes = []
+    for vidx in raw.get("vector_indexes", []):
+        vector_indexes.append(VectorIndexDef(**vidx))
+
     return NodeTypeDef(
         name=name,
         properties=properties,
         constraints=constraints,
         indexes=indexes,
+        vector_indexes=vector_indexes,
     )
 
 

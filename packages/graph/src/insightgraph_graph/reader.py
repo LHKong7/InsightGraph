@@ -89,6 +89,21 @@ class GraphReader:
     # Metric queries
     # ------------------------------------------------------------------
 
+    async def get_entity_metrics(self, entity_name: str) -> list[dict[str, Any]]:
+        """Return all metric values for an entity regardless of metric name."""
+        query = (
+            "MATCH (e:Entity)-[:HAS_VALUE]->(mv:MetricValue)-[:MEASURES]->(m:Metric) "
+            "WHERE e.canonical_name = $entity_name OR e.name = $entity_name "
+            "RETURN properties(mv) AS metric_value, "
+            "       properties(m) AS metric, "
+            "       properties(e) AS entity "
+            "ORDER BY m.name, mv.period"
+        )
+        async with self._conn.session() as session:
+            result = await session.run(query, entity_name=entity_name)
+            records = await result.data()
+        return records
+
     async def get_metric_history(
         self,
         metric_name: str,
@@ -184,3 +199,114 @@ class GraphReader:
             result = await session.run(query)
             records = await result.data()
         return records
+
+    # ------------------------------------------------------------------
+    # Graph-first / relationship queries
+    # ------------------------------------------------------------------
+
+    async def get_entity_relationships(
+        self,
+        entity_name: str,
+        depth: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Return all entities connected to *entity_name* with relationship info."""
+        query = (
+            "MATCH (e:Entity)-[r]-(other:Entity) "
+            "WHERE e.canonical_name = $name OR e.name = $name "
+            "RETURN type(r) AS relationship_type, "
+            "       properties(r) AS relationship_props, "
+            "       properties(other) AS related_entity, "
+            "       CASE WHEN startNode(r) = e THEN 'outgoing' ELSE 'incoming' END AS direction"
+        )
+        async with self._conn.session() as session:
+            result = await session.run(query, name=entity_name)
+            records = await result.data()
+        return records
+
+    async def find_path(
+        self,
+        entity_a: str,
+        entity_b: str,
+        max_depth: int = 4,
+    ) -> dict[str, Any]:
+        """Find shortest path between two entities."""
+        query = (
+            "MATCH (a:Entity), (b:Entity) "
+            "WHERE (a.canonical_name = $name_a OR a.name = $name_a) "
+            "  AND (b.canonical_name = $name_b OR b.name = $name_b) "
+            "MATCH path = shortestPath((a)-[*1.." + str(int(max_depth)) + "]-(b)) "
+            "UNWIND nodes(path) AS n "
+            "UNWIND relationships(path) AS rel "
+            "WITH collect(DISTINCT {labels: labels(n), props: properties(n)}) AS nodes, "
+            "     collect(DISTINCT {type: type(rel), props: properties(rel)}) AS edges "
+            "RETURN nodes, edges"
+        )
+        async with self._conn.session() as session:
+            result = await session.run(query, name_a=entity_a, name_b=entity_b)
+            record = await result.single()
+        if record is None:
+            return {"nodes": [], "edges": [], "found": False}
+        return {"nodes": record["nodes"], "edges": record["edges"], "found": True}
+
+    async def get_entity_full_profile(self, entity_name: str) -> dict[str, Any]:
+        """Return comprehensive entity profile: claims, metrics, evidence, relationships."""
+        query = (
+            "MATCH (e:Entity) "
+            "WHERE e.canonical_name = $name OR e.name = $name "
+            "OPTIONAL MATCH (e)<-[:MENTIONS|ABOUT]-(c:Claim) "
+            "OPTIONAL MATCH (c)-[:SUPPORTED_BY]->(span:SourceSpan) "
+            "OPTIONAL MATCH (e)-[:HAS_VALUE]->(mv:MetricValue)-[:MEASURES]->(m:Metric) "
+            "OPTIONAL MATCH (e)-[rel]-(other:Entity) "
+            "OPTIONAL MATCH (e)-[:SOURCED_FROM]->(r:Report) "
+            "WITH e, "
+            "     collect(DISTINCT {claim_id: c.claim_id, text: c.text, "
+            "             type: c.claim_type, confidence: c.confidence}) AS claims, "
+            "     collect(DISTINCT {text: span.text, page: span.page}) AS evidence, "
+            "     collect(DISTINCT {value: mv.value, unit: mv.unit, "
+            "             period: mv.period, metric_name: m.name}) AS metrics, "
+            "     collect(DISTINCT {name: other.canonical_name, type: other.entity_type, "
+            "             relationship: type(rel)}) AS related_entities, "
+            "     collect(DISTINCT {report_id: r.report_id, title: r.title}) AS reports "
+            "RETURN properties(e) AS entity, claims, evidence, metrics, "
+            "       related_entities, reports"
+        )
+        async with self._conn.session() as session:
+            result = await session.run(query, name=entity_name)
+            record = await result.single()
+        if record is None:
+            return {}
+        data = dict(record)
+        # Filter out null entries from OPTIONAL MATCH
+        data["claims"] = [c for c in data.get("claims", []) if c.get("claim_id")]
+        data["evidence"] = [e for e in data.get("evidence", []) if e.get("text")]
+        data["metrics"] = [m for m in data.get("metrics", []) if m.get("metric_name")]
+        data["related_entities"] = [r for r in data.get("related_entities", []) if r.get("name")]
+        data["reports"] = [r for r in data.get("reports", []) if r.get("report_id")]
+        return data
+
+    async def get_cross_report_entity(self, entity_name: str) -> dict[str, Any]:
+        """Find an entity across multiple reports with per-report claims and metrics."""
+        query = (
+            "MATCH (e:Entity)-[:SOURCED_FROM]->(r:Report) "
+            "WHERE e.canonical_name = $name OR e.name = $name "
+            "OPTIONAL MATCH (e)<-[:MENTIONS|ABOUT]-(c:Claim)"
+            "-[:SUPPORTED_BY]->(span:SourceSpan) "
+            "OPTIONAL MATCH (e)-[:HAS_VALUE]->(mv:MetricValue)-[:MEASURES]->(m:Metric) "
+            "WITH r, e, "
+            "     collect(DISTINCT {text: c.text, type: c.claim_type, "
+            "             page: span.page}) AS claims, "
+            "     collect(DISTINCT {value: mv.value, unit: mv.unit, "
+            "             period: mv.period, metric: m.name}) AS metrics "
+            "RETURN properties(e) AS entity, "
+            "       properties(r) AS report, "
+            "       claims, metrics "
+            "ORDER BY r.date"
+        )
+        async with self._conn.session() as session:
+            result = await session.run(query, name=entity_name)
+            records = await result.data()
+        # Filter nulls
+        for rec in records:
+            rec["claims"] = [c for c in rec.get("claims", []) if c.get("text")]
+            rec["metrics"] = [m for m in rec.get("metrics", []) if m.get("metric")]
+        return {"entity_name": entity_name, "reports": records}

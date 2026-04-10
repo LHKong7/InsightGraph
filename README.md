@@ -155,6 +155,14 @@ The agent runtime exposes five core tools:
 - **PDF Parsing**: PyMuPDF
 - **Package Management**: uv with workspaces
 
+## Documentation
+
+- [Architecture](docs/architecture.md) - System design, data flow, package structure
+- [API Reference](docs/api-reference.md) - REST API endpoints and MCP tools
+- [Ontology](docs/ontology.md) - Graph model (node types, edge types, properties)
+- [Evaluation](docs/evaluation.md) - Capability matrix, performance, test coverage, security
+- [MVP Roadmap](docs/mvp-roadmap.md) - Phase 1-4 roadmap
+
 ## License
 
 MIT

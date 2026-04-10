@@ -9,19 +9,19 @@ from insightgraph_core.ir.extraction import (
     ExtractionResult,
     ResolvedEntity,
 )
-from insightgraph_core.types import ClaimType, EntityType
+from insightgraph_core.types import ClaimType
 
 
 def test_extracted_entity():
     entity = ExtractedEntity(
         name="NVIDIA",
-        type=EntityType.ORGANIZATION,
+        type="ORGANIZATION",
         description="GPU company",
         source_block_id=uuid4(),
         source_text="NVIDIA Corporation",
     )
     assert entity.name == "NVIDIA"
-    assert entity.type == EntityType.ORGANIZATION
+    assert entity.type == "ORGANIZATION"
 
 
 def test_extracted_metric():
@@ -52,7 +52,7 @@ def test_extracted_claim():
 def test_resolved_entity():
     resolved = ResolvedEntity(
         canonical_name="NVIDIA Corporation",
-        type=EntityType.ORGANIZATION,
+        type="ORGANIZATION",
         aliases=["NVIDIA", "NVDA"],
         source_block_ids=[uuid4(), uuid4()],
     )

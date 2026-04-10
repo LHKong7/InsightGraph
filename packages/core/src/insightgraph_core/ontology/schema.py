@@ -22,6 +22,14 @@ class IndexDef(BaseModel):
     fulltext: list[str] = Field(default_factory=list)
 
 
+class VectorIndexDef(BaseModel):
+    """A vector index definition on a node type."""
+
+    property: str = "embedding"
+    dimensions: int = 1536
+    similarity: str = "cosine"
+
+
 class NodeTypeDef(BaseModel):
     """Definition of a node type in the ontology."""
 
@@ -29,6 +37,7 @@ class NodeTypeDef(BaseModel):
     properties: dict[str, PropertyDef] = Field(default_factory=dict)
     constraints: list[ConstraintDef] = Field(default_factory=list)
     indexes: list[IndexDef] = Field(default_factory=list)
+    vector_indexes: list[VectorIndexDef] = Field(default_factory=list)
 
 
 class EdgeTypeDef(BaseModel):

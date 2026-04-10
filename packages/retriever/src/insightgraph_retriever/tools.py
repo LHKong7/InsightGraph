@@ -161,6 +161,13 @@ class AgentTools:
             "get_metric_history": self._get_metric_history,
             "find_evidence_for_claim": self._find_evidence_for_claim,
             "get_subgraph_for_question": self._get_subgraph_for_question,
+            "find_related_entities": self._find_related_entities,
+            "find_path_between_entities": self._find_path_between_entities,
+            "get_entity_profile": self._get_entity_profile,
+            "compare_entity_across_reports": self._compare_entity_across_reports,
+            "find_metric_trend": self._find_metric_trend,
+            "find_contradictions": self._find_contradictions,
+            "entity_timeline": self._entity_timeline,
         }
         handler = handlers.get(tool_name)
         if not handler:
@@ -214,3 +221,54 @@ class AgentTools:
             return await self._graph.get_subgraph(top_entity_id, max_depth)
 
         return {"nodes": entities, "edges": []}
+
+    # --- Graph-first tools ---
+
+    async def _find_related_entities(
+        self,
+        entity_name: str,
+        relationship_type: str | None = None,
+        depth: int = 1,
+    ) -> list[dict]:
+        """Find entities related to the given entity via graph relationships."""
+        results = await self._graph._reader.get_entity_relationships(entity_name, depth)
+        if relationship_type:
+            results = [r for r in results if r.get("relationship_type") == relationship_type]
+        return results
+
+    async def _find_path_between_entities(
+        self, entity_a: str, entity_b: str, max_depth: int = 4
+    ) -> dict:
+        """Find the shortest path between two entities in the graph."""
+        return await self._graph._reader.find_path(entity_a, entity_b, max_depth)
+
+    async def _get_entity_profile(self, entity_name: str) -> dict:
+        """Get comprehensive entity profile: claims, metrics, evidence, relationships."""
+        return await self._graph._reader.get_entity_full_profile(entity_name)
+
+    # --- Cross-report tools ---
+
+    async def _compare_entity_across_reports(self, entity_name: str) -> dict:
+        """Compare an entity's data across all reports it appears in."""
+        return await self._graph._reader.get_cross_report_entity(entity_name)
+
+    async def _find_metric_trend(self, entity_name: str, metric_name: str) -> dict:
+        """Find metric trend for an entity across reports."""
+        from insightgraph_retriever.cross_report import CrossReportAnalyzer
+
+        analyzer = CrossReportAnalyzer(self._graph._reader)
+        return await analyzer.find_metric_trend(entity_name, metric_name)
+
+    async def _find_contradictions(self, entity_name: str) -> list[dict]:
+        """Find contradicting claims about an entity."""
+        from insightgraph_retriever.cross_report import CrossReportAnalyzer
+
+        analyzer = CrossReportAnalyzer(self._graph._reader)
+        return await analyzer.find_contradictions(entity_name)
+
+    async def _entity_timeline(self, entity_name: str) -> list[dict]:
+        """Build chronological timeline of claims and metrics for an entity."""
+        from insightgraph_retriever.cross_report import CrossReportAnalyzer
+
+        analyzer = CrossReportAnalyzer(self._graph._reader)
+        return await analyzer.entity_timeline(entity_name)

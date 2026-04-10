@@ -9,7 +9,7 @@ from uuid import uuid4
 from insightgraph_core.config import Settings
 from insightgraph_core.types import IngestionStatus
 from insightgraph_ingestion.detector import detect_format
-from insightgraph_ingestion.preprocessor import stage_file, validate_file
+from insightgraph_ingestion.preprocessor import compute_content_hash, stage_file, validate_file
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,11 @@ class IngestionTask:
     source_type: str = ""
     source_uri: str = ""
     staged_path: str = ""
+    content_hash: str = ""
     status: IngestionStatus = IngestionStatus.PENDING
     created_at: datetime = field(default_factory=datetime.utcnow)
     error: str | None = None
+    is_duplicate: bool = False
 
 
 class IngestionService:
@@ -34,20 +36,47 @@ class IngestionService:
     def __init__(self, settings: Settings | None = None):
         self._settings = settings or Settings()
         self._tasks: dict[str, IngestionTask] = {}
+        self._hash_index: dict[str, str] = {}  # content_hash -> task_id
 
     def ingest(self, file_path: Path) -> IngestionTask:
-        """Validate, detect format, stage file, and create an ingestion task."""
+        """Validate, detect format, check for duplicates, stage, and create task."""
         validate_file(file_path, max_size_mb=self._settings.max_file_size_mb)
 
         source_type = detect_format(file_path)
+        content_hash = compute_content_hash(file_path)
+
+        # Check for duplicate
+        if content_hash in self._hash_index:
+            existing_task_id = self._hash_index[content_hash]
+            existing = self._tasks.get(existing_task_id)
+            if existing:
+                logger.info(
+                    "Duplicate detected: %s matches task %s (report %s)",
+                    file_path,
+                    existing_task_id,
+                    existing.report_id,
+                )
+                task = IngestionTask(
+                    source_type=source_type,
+                    source_uri=str(file_path),
+                    content_hash=content_hash,
+                    is_duplicate=True,
+                    status=IngestionStatus.COMPLETED,
+                )
+                task.report_id = existing.report_id  # reuse existing report_id
+                self._tasks[task.task_id] = task
+                return task
+
         staged = stage_file(file_path, self._settings.upload_dir)
 
         task = IngestionTask(
             source_type=source_type,
             source_uri=str(file_path),
             staged_path=str(staged),
+            content_hash=content_hash,
         )
         self._tasks[task.task_id] = task
+        self._hash_index[content_hash] = task.task_id
         logger.info("Created ingestion task %s for %s (%s)", task.task_id, file_path, source_type)
         return task
 

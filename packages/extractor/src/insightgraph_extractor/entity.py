@@ -10,28 +10,16 @@ import litellm
 
 from insightgraph_core.ir.extraction import ExtractedEntity
 from insightgraph_core.ir.models import Block
-from insightgraph_core.types import EntityType
 from insightgraph_extractor.base import BaseExtractor
 from insightgraph_extractor.prompts.entity import (
-    ENTITY_SYSTEM_PROMPT,
     format_entity_prompt,
+    format_entity_system_prompt,
 )
 
 logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 5
 _MAX_CONCURRENCY = 4
-
-# Valid entity type values for fast lookup.
-_VALID_ENTITY_TYPES = {e.value for e in EntityType}
-
-
-def _parse_entity_type(raw: str) -> EntityType | None:
-    """Safely parse an entity type string, returning None if invalid."""
-    normalized = raw.strip().upper()
-    if normalized in _VALID_ENTITY_TYPES:
-        return EntityType(normalized)
-    return None
 
 
 def _parse_entities(raw_json: str, block_ids: list[UUID]) -> list[ExtractedEntity]:
@@ -60,9 +48,7 @@ def _parse_entities(raw_json: str, block_ids: list[UUID]) -> list[ExtractedEntit
         if not name:
             continue
 
-        entity_type = _parse_entity_type(item.get("type", "OTHER"))
-        if entity_type is None:
-            entity_type = EntityType.OTHER
+        entity_type = (item.get("type") or "OTHER").strip().upper()
 
         # Attempt to match source_text to a specific block.
         source_text = (item.get("source_text") or "").strip()
@@ -115,9 +101,17 @@ class EntityExtractor(BaseExtractor):
 
         ctx = context or {}
         doc_title = ctx.get("title") or "Unknown"
+        entity_types = ctx.get("entity_types")
+        domain_instructions = ctx.get("instructions", "")
+
+        # Build domain-aware system prompt
+        self._system_prompt = format_entity_system_prompt(entity_types)
 
         batches = self._make_batches(blocks)
-        tasks = [self._extract_batch(batch, doc_title=doc_title) for batch in batches]
+        tasks = [
+            self._extract_batch(batch, doc_title=doc_title, domain_instructions=domain_instructions)
+            for batch in batches
+        ]
         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         all_entities: list[ExtractedEntity] = []
@@ -135,12 +129,13 @@ class EntityExtractor(BaseExtractor):
         """Split blocks into batches of at most *batch_size*."""
         return [blocks[i : i + self.batch_size] for i in range(0, len(blocks), self.batch_size)]
 
-    async def _extract_batch(self, batch: list[Block], doc_title: str) -> list[ExtractedEntity]:
+    async def _extract_batch(
+        self, batch: list[Block], doc_title: str, domain_instructions: str = ""
+    ) -> list[ExtractedEntity]:
         """Call the LLM for a single batch of blocks."""
         combined_text = "\n\n".join(block.content for block in batch)
         block_ids = [block.id for block in batch]
 
-        # Derive a section title from the first heading block, if any.
         section_title = "Unknown"
         for block in batch:
             if block.level is not None:
@@ -151,7 +146,10 @@ class EntityExtractor(BaseExtractor):
             text=combined_text,
             doc_title=doc_title,
             section_title=section_title,
+            domain_instructions=domain_instructions,
         )
+
+        system_prompt = getattr(self, "_system_prompt", format_entity_system_prompt())
 
         async with self._semaphore:
             try:
@@ -159,7 +157,7 @@ class EntityExtractor(BaseExtractor):
                     model=self.model,
                     api_key=self.api_key or None,
                     messages=[
-                        {"role": "system", "content": ENTITY_SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     response_format={"type": "json_object"},
