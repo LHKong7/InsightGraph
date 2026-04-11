@@ -1,0 +1,17 @@
+{
+  "name": "insightgraph-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for InsightGraph - evidence-centric knowledge graph system",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["knowledge-graph", "neo4j", "rag", "graph-rag", "insightgraph"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5"
+  }
+}
