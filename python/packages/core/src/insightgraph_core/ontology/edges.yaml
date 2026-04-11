@@ -1,0 +1,91 @@
+edges:
+  # Document structure edges
+  HAS_SECTION:
+    from: [Report]
+    to: [Section]
+  HAS_PARAGRAPH:
+    from: [Section]
+    to: [Paragraph]
+  PART_OF:
+    from: [Section]
+    to: [Section]
+  HAS_SPAN:
+    from: [Paragraph]
+    to: [SourceSpan]
+
+  # Semantic relation edges
+  MENTIONS:
+    from: [Paragraph, Claim]
+    to: [Entity]
+  ASSERTS:
+    from: [Paragraph]
+    to: [Claim]
+  MEASURES:
+    from: [MetricValue]
+    to: [Metric]
+  HAS_VALUE:
+    from: [Entity]
+    to: [MetricValue]
+  REFERS_TO_PERIOD:
+    from: [MetricValue, Claim]
+    to: [TimePeriod]
+  ABOUT:
+    from: [Claim]
+    to: [Entity]
+
+  # Evidence relation edges
+  SUPPORTED_BY:
+    from: [Claim, MetricValue]
+    to: [SourceSpan]
+  DERIVED_FROM:
+    from: [MetricValue]
+    to: [SourceSpan]
+  SOURCED_FROM:
+    from: [Entity]
+    to: [Report]
+
+  # Entity-to-entity relationship edges
+  SUBSIDIARY_OF:
+    from: [Entity]
+    to: [Entity]
+  CEO_OF:
+    from: [Entity]
+    to: [Entity]
+  FOUNDER_OF:
+    from: [Entity]
+    to: [Entity]
+  BOARD_MEMBER_OF:
+    from: [Entity]
+    to: [Entity]
+  COMPETES_WITH:
+    from: [Entity]
+    to: [Entity]
+  PARTNERS_WITH:
+    from: [Entity]
+    to: [Entity]
+  INVESTED_IN:
+    from: [Entity]
+    to: [Entity]
+  SUPPLIES_TO:
+    from: [Entity]
+    to: [Entity]
+  ACQUIRED:
+    from: [Entity]
+    to: [Entity]
+  MERGED_WITH:
+    from: [Entity]
+    to: [Entity]
+  REGULATES:
+    from: [Entity]
+    to: [Entity]
+  OPERATES_IN:
+    from: [Entity]
+    to: [Entity]
+  EMPLOYS:
+    from: [Entity]
+    to: [Entity]
+
+  # Entity resolution edge
+  SAME_AS:
+    from: [Entity]
+    to: [Entity]

@@ -1,0 +1,38 @@
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[lint.per-file-ignores]
+# Allow long lines in files with LLM prompt templates
+"packages/agent_runtime/src/insightgraph_agent/planner.py" = ["E501"]
+"packages/agent_runtime/src/insightgraph_agent/analyst.py" = ["E501"]
+"packages/agent_runtime/src/insightgraph_agent/verifier.py" = ["E501"]
+"packages/resolver/src/insightgraph_resolver/entity_resolver.py" = ["E501"]
+"packages/extractor/src/insightgraph_extractor/prompts/*" = ["E501"]
+"packages/extractor/src/insightgraph_extractor/entity.py" = ["E501"]
+"packages/extractor/src/insightgraph_extractor/metric.py" = ["E501"]
+"packages/extractor/src/insightgraph_extractor/claim.py" = ["E501"]
+"packages/retriever/src/insightgraph_retriever/tools.py" = ["E501"]
+"packages/retriever/src/insightgraph_retriever/cross_report.py" = ["E501"]
+"packages/retriever/src/insightgraph_retriever/analytics.py" = ["E501"]
+"packages/extractor/src/insightgraph_extractor/relationship.py" = ["E501"]
+"packages/retriever/src/insightgraph_retriever/hybrid_retriever.py" = ["E501"]
+"apps/mcp-server/src/insightgraph_mcp/server.py" = ["E501"]
+"apps/api/src/insightgraph_api/routes/search.py" = ["E501"]
+
+[lint.isort]
+known-first-party = [
+    "insightgraph_core",
+    "insightgraph_ingestion",
+    "insightgraph_parser",
+    "insightgraph_extractor",
+    "insightgraph_resolver",
+    "insightgraph_graph",
+    "insightgraph_retriever",
+    "insightgraph_agent",
+    "insightgraph_api",
+    "insightgraph_worker",
+    "insightgraph_mcp",
+]

@@ -29,20 +29,27 @@ InsightGraph is an open-source system that converts PDF reports into structured 
 4. **Tool-first** - Agents use explicit tools with defined schemas, not free-form Cypher
 5. **Analysis objectified** - Trends, comparisons, contradictions are explicit graph objects
 
+## Repository Structure
+
+```
+InsightGraph/
+├── python/                  # Python backend (API, worker, MCP server, all packages)
+│   ├── packages/            # Core libraries (8 packages)
+│   ├── apps/                # API server, Celery worker, MCP server
+│   ├── tests/               # Python unit tests
+│   └── pyproject.toml       # uv workspace root
+├── typescript/
+│   ├── sdk/                 # TypeScript SDK (insightgraph-sdk)
+│   └── web/                 # Next.js frontend with graph visualization
+└── docs/                    # Architecture, API reference, evaluation
+```
+
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Docker & Docker Compose (for Neo4j and Redis)
-
-### Setup
+### Python Backend
 
 ```bash
-# Clone the repository
-git clone https://github.com/LHKong7/InsightGraph.git
-cd InsightGraph
+cd python
 
 # Start infrastructure
 make docker-up
@@ -69,7 +76,43 @@ export IG_LLM_API_KEY=your-api-key
 ### Run the API
 
 ```bash
+cd python
 uv run uvicorn insightgraph_api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### TypeScript SDK
+
+```bash
+npm install insightgraph-sdk
+```
+
+```typescript
+import { InsightGraphClient } from "insightgraph-sdk";
+
+const client = new InsightGraphClient({ baseUrl: "http://localhost:8000" });
+
+// Search
+const results = await client.search({ query: "revenue growth", mode: "hybrid" });
+
+// Agent query
+const answer = await client.agentQuery({ question: "What drove revenue growth?" });
+console.log(answer.answer, answer.confidence);
+
+// Entity profile
+const entities = await client.searchEntities("NVIDIA");
+
+// Session-based conversation
+const session = await client.createSession();
+const r1 = await client.agentQuery({ question: "Tell me about Company X", session_id: session.session_id });
+const r2 = await client.agentQuery({ question: "What are its key risks?", session_id: session.session_id });
+```
+
+### Web Frontend
+
+```bash
+cd typescript/web
+npm install
+npm run dev   # http://localhost:3000
 ```
 
 ### Run the Celery Worker
