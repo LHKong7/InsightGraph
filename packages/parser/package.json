@@ -1,0 +1,22 @@
+{
+  "name": "@insightgraph/parser",
+  "version": "0.1.0",
+  "description": "Document parser for InsightGraph – converts PDF/CSV/JSON to DocumentIR",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@insightgraph/core": "workspace:*",
+    "unpdf": "^0.12.0",
+    "csv-parse": "^5.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "license": "MIT"
+}

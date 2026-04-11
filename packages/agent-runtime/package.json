@@ -1,0 +1,21 @@
+{
+  "name": "@insightgraph/agent-runtime",
+  "version": "0.1.0",
+  "description": "Agent pipeline for InsightGraph: Planner -> RetrieverAgent -> Analyst -> Verifier",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@insightgraph/core": "workspace:*",
+    "openai": "^4.70"
+  },
+  "devDependencies": {
+    "typescript": "^5.5",
+    "@types/node": "^22.0"
+  },
+  "license": "MIT"
+}

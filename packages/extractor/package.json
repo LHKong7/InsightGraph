@@ -1,0 +1,22 @@
+{
+  "name": "@insightgraph/extractor",
+  "version": "0.1.0",
+  "description": "LLM-based extraction of entities, metrics, claims, and relationships",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@insightgraph/core": "workspace:*",
+    "openai": "^4.70",
+    "p-limit": "^6.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.5",
+    "@types/node": "^22.0"
+  },
+  "license": "MIT"
+}

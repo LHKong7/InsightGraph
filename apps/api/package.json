@@ -1,0 +1,30 @@
+{
+  "name": "@insightgraph/api",
+  "version": "0.1.0",
+  "description": "InsightGraph API server (Hono)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@insightgraph/core": "workspace:*",
+    "@insightgraph/graph": "workspace:*",
+    "@insightgraph/extractor": "workspace:*",
+    "@insightgraph/resolver": "workspace:*",
+    "@insightgraph/parser": "workspace:*",
+    "@insightgraph/retriever": "workspace:*",
+    "@insightgraph/agent-runtime": "workspace:*",
+    "hono": "^4.6",
+    "@hono/node-server": "^1.13",
+    "bullmq": "^5.25",
+    "ioredis": "^5.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.5",
+    "@types/node": "^22.0"
+  },
+  "license": "MIT"
+}

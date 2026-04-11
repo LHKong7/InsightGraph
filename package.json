@@ -1,0 +1,17 @@
+{
+  "name": "insightgraph",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
+    "lint": "pnpm -r run lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "prettier": "^3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.5",
+    "vitest": "^3.0"
+  }
+}
