@@ -9,9 +9,23 @@
     "dev": "tsc --watch",
     "lint": "tsc --noEmit"
   },
-  "keywords": ["knowledge-graph", "neo4j", "rag", "graph-rag", "insightgraph"],
+  "keywords": [
+    "knowledge-graph",
+    "neo4j",
+    "rag",
+    "graph-rag",
+    "insightgraph"
+  ],
   "license": "MIT",
   "devDependencies": {
     "typescript": "^5.5"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

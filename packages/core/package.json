@@ -17,5 +17,13 @@
     "typescript": "^5.5",
     "@types/node": "^22.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
