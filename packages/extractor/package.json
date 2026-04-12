@@ -1,6 +1,6 @@
 {
   "name": "@insightgraph/extractor",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "LLM-based extraction of entities, metrics, claims, and relationships",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

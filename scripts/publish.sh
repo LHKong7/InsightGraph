@@ -96,11 +96,11 @@ warn()  { printf "\033[33m⚠\033[0m %s\n" "$*"; }
 err()   { printf "\033[31m✗\033[0m %s\n" "$*"; }
 
 pkg_name() {
-  node -p "require('$1/package.json').name"
+  node -p "require('./$1/package.json').name"
 }
 
 pkg_version() {
-  node -p "require('$1/package.json').version"
+  node -p "require('./$1/package.json').version"
 }
 
 # ---------------------------------------------------------------------------
@@ -141,13 +141,16 @@ fi
 
 # Verify npm auth for the registry we'll publish to (skipped on dry-run)
 if [ "$DRY_RUN" != true ]; then
-  NPM_REG_ARGS=()
-  if [ -n "$REGISTRY" ]; then NPM_REG_ARGS+=("--registry" "$REGISTRY"); fi
-  if ! npm whoami "${NPM_REG_ARGS[@]}" >/dev/null 2>&1; then
+  if [ -n "$REGISTRY" ]; then
+    WHOAMI=$(npm whoami --registry "$REGISTRY" 2>/dev/null || true)
+  else
+    WHOAMI=$(npm whoami 2>/dev/null || true)
+  fi
+  if [ -z "$WHOAMI" ]; then
     err "Not logged in to npm${REGISTRY:+ ($REGISTRY)}. Run: npm login${REGISTRY:+ --registry $REGISTRY}"
     exit 1
   fi
-  ok "Logged in as: $(npm whoami "${NPM_REG_ARGS[@]}")"
+  ok "Logged in as: $WHOAMI"
 fi
 
 # ---------------------------------------------------------------------------

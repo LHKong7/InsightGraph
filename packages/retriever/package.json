@@ -1,6 +1,6 @@
 {
   "name": "@insightgraph/retriever",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Search and retrieval combining graph queries for InsightGraph",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

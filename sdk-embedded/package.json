@@ -1,6 +1,6 @@
 {
   "name": "@insightgraph/sdk-embedded",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Embed the full InsightGraph pipeline (parse -> extract -> resolve -> write -> query) in-process inside your Electron or Node.js app.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -1,6 +1,6 @@
 {
   "name": "@insightgraph/graph",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Neo4j graph layer for InsightGraph",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

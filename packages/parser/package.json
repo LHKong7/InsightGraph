@@ -1,6 +1,6 @@
 {
   "name": "@insightgraph/parser",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Document parser for InsightGraph – converts PDF/CSV/JSON/Markdown/XLSX to DocumentIR",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
