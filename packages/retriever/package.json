@@ -1,7 +1,7 @@
 {
   "name": "@insightgraph/retriever",
   "version": "0.1.0",
-  "description": "Search and retrieval combining graph queries and vector search for InsightGraph",
+  "description": "Search and retrieval combining graph queries for InsightGraph",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -12,8 +12,7 @@
   "dependencies": {
     "@insightgraph/core": "workspace:*",
     "@insightgraph/graph": "workspace:*",
-    "neo4j-driver": "^5.27",
-    "openai": "^4.70"
+    "neo4j-driver": "^5.27"
   },
   "devDependencies": {
     "typescript": "^5.5",

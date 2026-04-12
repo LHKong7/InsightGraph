@@ -22,6 +22,9 @@ export async function buildGraph(job: Job<BuildGraphJobData>): Promise<Record<st
   const doc = documentIR;
   const domainConfig = loadDomainConfig(settings.domain);
 
+  console.log(`[build-graph] Starting extraction for report ${reportId}`);
+  console.log(`[build-graph] Model: ${settings.llmModel}, Sections: ${doc.sections?.length ?? 0}`);
+
   // Extract
   const pipeline = new ExtractionPipeline(
     settings.llmModel,
@@ -30,6 +33,7 @@ export async function buildGraph(job: Job<BuildGraphJobData>): Promise<Record<st
     domainConfig,
   );
   let extractions: ExtractionResult = await pipeline.extract(doc);
+  console.log(`[build-graph] Extraction done: ${extractions.entities.length} entities, ${extractions.metrics.length} metrics, ${extractions.claims.length} claims, ${extractions.relationships.length} relationships`);
 
   // Resolve entities
   const resolver = new ResolverService(
@@ -38,6 +42,7 @@ export async function buildGraph(job: Job<BuildGraphJobData>): Promise<Record<st
     settings.llmBaseUrl,
   );
   extractions = await resolver.resolve(extractions);
+  console.log(`[build-graph] Resolution done: ${extractions.resolvedEntities.length} resolved entities`);
 
   // Write to Neo4j
   const conn = new Neo4jConnection(
@@ -48,6 +53,7 @@ export async function buildGraph(job: Job<BuildGraphJobData>): Promise<Record<st
   try {
     const writer = new GraphWriter(conn);
     const result = await writer.writeDocument(doc, extractions);
+    console.log(`[build-graph] Graph written:`, JSON.stringify(result));
     return result;
   } finally {
     await conn.close();

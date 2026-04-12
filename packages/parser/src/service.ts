@@ -5,6 +5,8 @@ import type { BaseParser } from "./base";
 import { PdfParser } from "./pdf";
 import { CsvParser } from "./csv";
 import { JsonParser } from "./json";
+import { MarkdownParser } from "./markdown";
+import { XlsxParser } from "./xlsx";
 
 /**
  * Registry-based service that delegates parsing to format-specific parsers.
@@ -21,10 +23,16 @@ export class ParserService {
     if (parsers) {
       this._parsers = new Map(Object.entries(parsers));
     } else {
+      const md = new MarkdownParser();
+      const xlsx = new XlsxParser();
       this._parsers = new Map<string, BaseParser>([
         ["pdf", new PdfParser()],
         ["csv", new CsvParser()],
         ["json", new JsonParser()],
+        ["md", md],
+        ["markdown", md],
+        ["xlsx", xlsx],
+        ["xls", xlsx],
       ]);
     }
   }

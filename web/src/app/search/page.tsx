@@ -25,8 +25,9 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Search</h1>
+    <div className="flex-1 overflow-auto">
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-6">Search</h1>
 
       <form onSubmit={handleSearch} className="flex gap-2 mb-6">
         <input
@@ -98,6 +99,7 @@ export default function SearchPage() {
         {results.length === 0 && !loading && query && (
           <p className="text-gray-500 text-center py-8">No results found</p>
         )}
+      </div>
       </div>
     </div>
   );

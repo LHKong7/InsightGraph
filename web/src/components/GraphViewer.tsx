@@ -43,22 +43,40 @@ export default function GraphViewer({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [FG, setFG] = useState<any>(null);
-  const [dims, setDims] = useState({ w: width || 800, h: height || 600 });
+  const [dims, setDims] = useState({ w: width || 0, h: height || 0 });
 
   useEffect(() => {
     import("react-force-graph-2d").then((mod) => setFG(() => mod.default));
   }, []);
 
   useEffect(() => {
-    if (!width && containerRef.current) {
-      const ro = new ResizeObserver((entries) => {
-        const { width: w, height: h } = entries[0].contentRect;
-        setDims({ w, h: h || 600 });
+    if (width && height) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      setDims({
+        w: Math.max(1, Math.floor(rect.width)),
+        h: Math.max(1, Math.floor(rect.height)),
       });
-      ro.observe(containerRef.current);
-      return () => ro.disconnect();
-    }
-  }, [width]);
+    };
+
+    // Initial measurement (next tick to catch post-layout)
+    measure();
+    const raf = requestAnimationFrame(measure);
+
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+
+    window.addEventListener("resize", measure);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [width, height]);
 
   const handleNodeClick = useCallback(
     (node: any) => {
@@ -79,13 +97,20 @@ export default function GraphViewer({
     })),
   };
 
+  const w = width ?? dims.w;
+  const h = height ?? dims.h;
+  const ready = FG && w > 0 && h > 0;
+
   return (
-    <div ref={containerRef} className="w-full h-full bg-gray-950 rounded-lg overflow-hidden">
-      {FG ? (
+    <div
+      ref={containerRef}
+      className="absolute inset-0 bg-gray-950 overflow-hidden"
+    >
+      {ready ? (
         <FG
           graphData={graphData}
-          width={width || dims.w}
-          height={height || dims.h}
+          width={w}
+          height={h}
           nodeLabel={(n: any) => `${n.label} (${n.type})`}
           nodeColor={(n: any) => n.color}
           nodeVal={(n: any) => n.val}

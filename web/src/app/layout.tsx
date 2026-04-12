@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased dark">
-      <body className="min-h-full flex flex-col bg-gray-950 text-gray-100 font-sans">
+      <body className="h-full flex flex-col bg-gray-950 text-gray-100 font-sans overflow-hidden">
         <nav className="border-b border-gray-800 bg-gray-900">
           <div className="max-w-7xl mx-auto px-4 flex items-center h-14 gap-8">
             <Link href="/" className="text-lg font-bold text-white">
@@ -40,7 +40,7 @@ export default function RootLayout({
             </div>
           </div>
         </nav>
-        <main className="flex-1 flex flex-col">{children}</main>
+        <main className="flex-1 flex flex-col min-h-0">{children}</main>
       </body>
     </html>
   );

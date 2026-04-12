@@ -42,12 +42,20 @@ export class ExtractionPipeline {
       domain: this.domain,
     };
 
-    // Phase 1: Extract entities, metrics, claims in parallel
-    const [entities, metrics, claims] = await Promise.all([
-      this.entityExtractor.extract(textBlocks, context),
-      this.metricExtractor.extract(textBlocks, context),
-      this.claimExtractor.extract(textBlocks, context),
-    ]);
+    console.log(`[pipeline] Starting extraction: ${textBlocks.length} blocks`);
+
+    // Extract sequentially to avoid API rate limits with slow reasoning models
+    console.log(`[pipeline] Extracting entities...`);
+    const entities = await this.entityExtractor.extract(textBlocks, context);
+    console.log(`[pipeline] Entities done: ${entities.length}`);
+
+    console.log(`[pipeline] Extracting metrics...`);
+    const metrics = await this.metricExtractor.extract(textBlocks, context);
+    console.log(`[pipeline] Metrics done: ${metrics.length}`);
+
+    console.log(`[pipeline] Extracting claims...`);
+    const claims = await this.claimExtractor.extract(textBlocks, context);
+    console.log(`[pipeline] Claims done: ${claims.length}`);
 
     // Phase 2: Extract relationships (needs entity names from phase 1)
     const entityNames = entities.map((e) => e.name);
@@ -55,6 +63,7 @@ export class ExtractionPipeline {
       title: context.title,
       entityNames,
     });
+    console.log(`[pipeline] Relationships done: ${relationships.length}`);
 
     return {
       documentId: doc.id,

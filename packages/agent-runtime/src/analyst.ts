@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
 
 export const ANALYST_SYSTEM_PROMPT = `You are an analyst for InsightGraph. Given retrieved data from a knowledge graph, synthesize a clear, evidence-backed answer.
@@ -33,7 +33,7 @@ export interface AnalysisResult {
  * Synthesizes retrieved data into structured analysis with citations.
  */
 export class Analyst {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
 
   constructor(model = "gpt-4o-mini", apiKey = "", baseUrl = "") {

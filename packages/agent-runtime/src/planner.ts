@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
 
 export const PLANNER_SYSTEM_PROMPT = `You are a query planner for InsightGraph, a graph-first knowledge system built from reports.
@@ -55,7 +55,7 @@ export interface PlanResult {
  * Decomposes user questions into tool execution plans.
  */
 export class Planner {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
 
   constructor(model = "gpt-4o-mini", apiKey = "", baseUrl = "") {

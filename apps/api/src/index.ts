@@ -18,16 +18,17 @@ async function main() {
   try {
     await neo4j.verifyConnectivity();
     console.log(`Connected to Neo4j at ${settings.neo4jUri}`);
-  } catch {
-    console.warn("Neo4j not available, some features will be limited");
+  } catch (err) {
+    console.warn("Neo4j connectivity check failed:", (err as Error).message);
+    console.warn("Will attempt queries anyway — Neo4j may still work.");
   }
 
   // Ensure graph schema
   try {
     await ensureSchema(neo4j, ontology);
     console.log("Graph schema ensured");
-  } catch {
-    console.warn("Could not ensure graph schema");
+  } catch (err) {
+    console.warn("Could not ensure graph schema:", (err as Error).message);
   }
 
   const app = createApp(neo4j, settings);

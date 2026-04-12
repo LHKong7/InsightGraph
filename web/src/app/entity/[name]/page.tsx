@@ -60,10 +60,11 @@ export default function EntityPage({ params }: { params: Promise<{ name: string 
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <Link href="/" className="text-blue-400 hover:underline text-sm">
-        Back to graph
-      </Link>
+    <div className="flex-1 overflow-auto">
+      <div className="max-w-4xl mx-auto p-6">
+        <Link href="/" className="text-blue-400 hover:underline text-sm">
+          Back to graph
+        </Link>
 
       <div className="mt-4">
         <h1 className="text-3xl font-bold">
@@ -151,6 +152,7 @@ export default function EntityPage({ params }: { params: Promise<{ name: string 
             <p className="text-gray-500 text-sm">No metrics found</p>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

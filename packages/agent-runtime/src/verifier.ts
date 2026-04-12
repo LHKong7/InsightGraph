@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
 
 export const VERIFIER_SYSTEM_PROMPT = `You are a verification agent for InsightGraph. Your job is to verify an analysis by checking:
@@ -38,7 +38,7 @@ export interface VerificationResult {
  * Checks conclusions for evidence support, contradictions, and confidence.
  */
 export class Verifier {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
 
   constructor(model = "gpt-4o-mini", apiKey = "", baseUrl = "") {

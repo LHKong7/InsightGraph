@@ -1,14 +1,15 @@
 import type { Block, ExtractedRelationship } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
-import type OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { RELATIONSHIP_SYSTEM_PROMPT, formatRelationshipPrompt } from "./prompts/relationship";
+import { createLimiter } from "./concurrency";
 
 const BATCH_SIZE = 5;
 const MAX_CONCURRENCY = 4;
 const REL_TYPE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 export class RelationshipExtractor {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
   private batchSize: number;
 
@@ -22,8 +23,7 @@ export class RelationshipExtractor {
     blocks: Block[],
     context?: { title?: string; entityNames?: string[] },
   ): Promise<ExtractedRelationship[]> {
-    const pLimit = (await import("p-limit")).default;
-    const limit = pLimit(MAX_CONCURRENCY);
+    const limit = createLimiter(MAX_CONCURRENCY);
     const docTitle = context?.title ?? "Unknown";
     const entityNames = context?.entityNames ?? [];
     const entityNamesLower = new Set(entityNames.map((n) => n.toLowerCase()));

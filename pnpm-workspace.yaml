@@ -2,5 +2,6 @@ packages:
   - "packages/*"
   - "apps/*"
   - "sdk"
+  - "sdk-embedded"
   - "web"
   - "electron-integration"

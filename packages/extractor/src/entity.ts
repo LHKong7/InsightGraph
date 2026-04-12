@@ -1,13 +1,14 @@
 import type { Block, ExtractedEntity, DomainConfig } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
-import type OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { formatEntityPrompt, formatEntitySystemPrompt } from "./prompts/entity";
+import { createLimiter } from "./concurrency";
 
 const BATCH_SIZE = 5;
 const MAX_CONCURRENCY = 4;
 
 export class EntityExtractor {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
   private batchSize: number;
 
@@ -26,8 +27,7 @@ export class EntityExtractor {
     blocks: Block[],
     context?: { title?: string; domain?: DomainConfig },
   ): Promise<ExtractedEntity[]> {
-    const pLimit = (await import("p-limit")).default;
-    const limit = pLimit(MAX_CONCURRENCY);
+    const limit = createLimiter(MAX_CONCURRENCY);
     const docTitle = context?.title ?? "Unknown";
     const domainInstructions = context?.domain?.extractionInstructions ?? "";
     const entityTypes = context?.domain?.entityTypes;
@@ -63,12 +63,15 @@ export class EntityExtractor {
     const userPrompt = formatEntityPrompt(combinedText, docTitle, sectionTitle, domainInstructions);
 
     try {
+      console.log(`[entity-extractor] Calling LLM (model: ${this.model}, prompt length: ${userPrompt.length})`);
       const raw = await chatJSON(this.client, this.model, [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ]);
+      console.log(`[entity-extractor] LLM response: ${raw.length} chars`);
       return parseEntities(raw, blockIds);
-    } catch {
+    } catch (err) {
+      console.error(`[entity-extractor] LLM call failed:`, (err as Error).message);
       return [];
     }
   }

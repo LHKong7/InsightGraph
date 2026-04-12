@@ -21,6 +21,12 @@ export function createApp(
 
   app.use("*", cors());
 
+  // Global error handler
+  app.onError((err, c) => {
+    console.error(`[${c.req.method} ${c.req.path}] Error:`, err.message);
+    return c.json({ error: err.message }, 500);
+  });
+
   // Inject shared state
   app.use("*", async (c, next) => {
     c.set("neo4j", neo4j);

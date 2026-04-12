@@ -1,4 +1,5 @@
-import { Neo4jConnection } from "./connection";
+import neo4j from "neo4j-driver";
+import { Neo4jConnection, toPlainObject } from "./connection";
 
 export class GraphReader {
   constructor(private conn: Neo4jConnection) {}
@@ -11,7 +12,7 @@ export class GraphReader {
     limit = 50,
   ): Promise<Record<string, unknown>[]> {
     let query: string;
-    const params: Record<string, unknown> = { limit };
+    const params: Record<string, unknown> = { limit: neo4j.int(Math.trunc(limit)) };
 
     if (name) {
       query =
@@ -33,7 +34,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query, params);
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -46,7 +47,7 @@ export class GraphReader {
     try {
       const result = await session.run(query, { entityId });
       const record = result.records[0];
-      return record ? (record.get("entity") as Record<string, unknown>) : null;
+      return record ? (toPlainObject(record.get("entity")) as Record<string, unknown>) : null;
     } finally {
       await session.close();
     }
@@ -62,7 +63,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query, { entityName });
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -75,7 +76,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query, { claimId });
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -92,7 +93,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query, { entityName });
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -124,7 +125,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query, params);
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -161,8 +162,8 @@ export class GraphReader {
       const record = result.records[0];
       if (!record) return { nodes: [], edges: [] };
       return {
-        nodes: record.get("nodes") as unknown[],
-        edges: record.get("edges") as unknown[],
+        nodes: toPlainObject(record.get("nodes")) as unknown[],
+        edges: toPlainObject(record.get("edges")) as unknown[],
       };
     } finally {
       await session.close();
@@ -178,7 +179,7 @@ export class GraphReader {
     try {
       const result = await session.run(query, { reportId });
       const record = result.records[0];
-      return record ? (record.get("report") as Record<string, unknown>) : null;
+      return record ? (toPlainObject(record.get("report")) as Record<string, unknown>) : null;
     } finally {
       await session.close();
     }
@@ -190,7 +191,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query);
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -208,7 +209,7 @@ export class GraphReader {
     const session = this.conn.session();
     try {
       const result = await session.run(query, { name: entityName });
-      return result.records.map((r) => r.toObject());
+      return result.records.map((r) => toPlainObject(r.toObject()) as Record<string, unknown>);
     } finally {
       await session.close();
     }
@@ -237,8 +238,8 @@ export class GraphReader {
       const record = result.records[0];
       if (!record) return { nodes: [], edges: [], found: false };
       return {
-        nodes: record.get("nodes") as unknown[],
-        edges: record.get("edges") as unknown[],
+        nodes: toPlainObject(record.get("nodes")) as unknown[],
+        edges: toPlainObject(record.get("edges")) as unknown[],
         found: true,
       };
     } finally {
@@ -271,7 +272,7 @@ export class GraphReader {
       const result = await session.run(query, { name: entityName });
       const record = result.records[0];
       if (!record) return {};
-      const data = record.toObject() as Record<string, unknown>;
+      const data = toPlainObject(record.toObject()) as Record<string, unknown>;
       // Filter null entries from OPTIONAL MATCH
       const filterNulls = (arr: Record<string, unknown>[], key: string) =>
         (arr ?? []).filter((item) => item[key] != null);
@@ -302,7 +303,7 @@ export class GraphReader {
     try {
       const result = await session.run(query, { name: entityName });
       const records = result.records.map((r) => {
-        const obj = r.toObject() as Record<string, unknown>;
+        const obj = toPlainObject(r.toObject()) as Record<string, unknown>;
         const filterNulls = (arr: Record<string, unknown>[], key: string) =>
           (arr ?? []).filter((item) => item[key] != null);
         obj.claims = filterNulls(obj.claims as Record<string, unknown>[], "text");

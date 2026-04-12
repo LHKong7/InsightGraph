@@ -1,5 +1,10 @@
 // Config
-export { getSettings, resetSettings } from "./config";
+export {
+  getSettings,
+  setSettings,
+  createSettings,
+  resetSettings,
+} from "./config";
 export type { Settings } from "./config";
 
 // Types
@@ -70,3 +75,4 @@ export type {
 
 // LLM
 export { createLLMClient, chatJSON } from "./llm";
+export type { LLMClient, ChatCompletionMessageParam } from "./llm";

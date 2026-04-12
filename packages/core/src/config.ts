@@ -29,12 +29,9 @@ function envInt(key: string, defaultValue: number): number {
   return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
-let _cached: Settings | null = null;
-
-export function getSettings(): Settings {
-  if (_cached) return _cached;
-
-  _cached = {
+/** Build a Settings object from env vars (no cache). */
+function envDefaults(): Settings {
+  return {
     neo4jUri: envStr("IG_NEO4J_URI", "bolt://localhost:7687"),
     neo4jUser: envStr("IG_NEO4J_USER", "neo4j"),
     neo4jPassword: envStr("IG_NEO4J_PASSWORD", "insightgraph"),
@@ -48,8 +45,32 @@ export function getSettings(): Settings {
     extractionMaxConcurrency: envInt("IG_EXTRACTION_MAX_CONCURRENCY", 5),
     domain: envStr("IG_DOMAIN", "default"),
   };
+}
 
+/**
+ * Build a Settings object from env-var defaults, then apply programmatic overrides.
+ * Does not touch the internal cache — callers can build ad-hoc Settings without
+ * affecting other parts of the app that rely on `getSettings()`.
+ */
+export function createSettings(overrides: Partial<Settings> = {}): Settings {
+  return { ...envDefaults(), ...overrides };
+}
+
+let _cached: Settings | null = null;
+
+/**
+ * Return the process-wide Settings singleton, loading from env vars on first call.
+ * Use `setSettings()` first to inject a programmatic config (e.g. from the SDK).
+ */
+export function getSettings(): Settings {
+  if (_cached) return _cached;
+  _cached = envDefaults();
   return _cached;
+}
+
+/** Inject a Settings singleton (overrides env). Useful for SDK consumers. */
+export function setSettings(settings: Settings): void {
+  _cached = settings;
 }
 
 /** Reset cached settings (useful for testing). */

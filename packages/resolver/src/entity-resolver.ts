@@ -1,6 +1,6 @@
 import type { ExtractedEntity, ResolvedEntity } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
-import type OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 
 const RESOLUTION_PROMPT = `You are an entity resolution system. Given a list of entity mentions extracted from a document, identify which mentions refer to the same real-world entity.
 
@@ -64,7 +64,7 @@ function groupsToResolved(
 }
 
 export class EntityResolver {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
 
   constructor(model: string, apiKey: string, baseUrl = "") {

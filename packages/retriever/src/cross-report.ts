@@ -1,6 +1,6 @@
 import { createLLMClient, chatJSON } from "@insightgraph/core";
 import { GraphReader } from "@insightgraph/graph";
-import type OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 
 /**
  * Cross-report analysis: compare entities across reports, find trends
@@ -8,7 +8,7 @@ import type OpenAI from "openai";
  */
 export class CrossReportAnalyzer {
   private reader: GraphReader;
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
 
   constructor(

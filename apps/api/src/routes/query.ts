@@ -69,3 +69,60 @@ queryRoutes.get("/reports/:reportId", async (c) => {
   if (!report) return c.json({ error: "Report not found" }, 404);
   return c.json(report);
 });
+
+/** Get the full subgraph for one report (Report node + all connected entities/claims/metrics). */
+queryRoutes.get("/reports/:reportId/graph", async (c) => {
+  const neo4j = c.get("neo4j");
+  const reportId = c.req.param("reportId");
+  const depth = Math.max(1, Math.min(parseInt(c.req.query("depth") ?? "3"), 5));
+
+  // Custom query that walks from the Report node through structure + semantic edges.
+  // We intentionally skip the huge SourceSpan/Paragraph fan-out by default so the
+  // client gets a readable graph focused on entities, claims, metrics.
+  const cypher = `
+    MATCH (r:Report {report_id: $reportId})
+    OPTIONAL MATCH (r)<-[:SOURCED_FROM]-(e:Entity)
+    OPTIONAL MATCH (e)<-[:ABOUT|MENTIONS]-(c:Claim)
+    OPTIONAL MATCH (e)-[:HAS_VALUE]->(mv:MetricValue)-[:MEASURES]->(m:Metric)
+    OPTIONAL MATCH (e)-[rel]-(e2:Entity) WHERE e2 <> e AND (e2)-[:SOURCED_FROM]->(r)
+    WITH collect(DISTINCT r) + collect(DISTINCT e) + collect(DISTINCT c) + collect(DISTINCT m) + collect(DISTINCT mv) + collect(DISTINCT e2) AS nodeList,
+         collect(DISTINCT rel) AS entityRels
+    UNWIND nodeList AS node
+    WITH collect(DISTINCT {
+      id: elementId(node),
+      labels: labels(node),
+      props: properties(node)
+    }) AS nodes, entityRels
+    MATCH (r2:Report {report_id: $reportId})
+    OPTIONAL MATCH p = (r2)-[*1..${depth}]-(other)
+    WHERE any(n IN nodes WHERE n.id = elementId(other))
+    UNWIND relationships(p) AS rel
+    WITH nodes, entityRels, collect(DISTINCT rel) AS pathRels
+    WITH nodes, entityRels + pathRels AS allRels
+    UNWIND allRels AS rel
+    WITH nodes, collect(DISTINCT {
+      id: elementId(rel),
+      type: type(rel),
+      startId: elementId(startNode(rel)),
+      endId: elementId(endNode(rel)),
+      props: properties(rel)
+    }) AS edges
+    RETURN nodes, edges
+  `;
+
+  const session = neo4j.session();
+  try {
+    const result = await session.run(cypher, { reportId });
+    const record = result.records[0];
+    if (!record) {
+      return c.json({ nodes: [], edges: [] });
+    }
+    const { toPlainObject } = await import("@insightgraph/graph");
+    return c.json({
+      nodes: toPlainObject(record.get("nodes")),
+      edges: toPlainObject(record.get("edges")),
+    });
+  } finally {
+    await session.close();
+  }
+});

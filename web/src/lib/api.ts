@@ -87,6 +87,12 @@ export async function listReports() {
   return fetchJSON<{ reports: any[]; count: number }>(`/api/v1/reports`);
 }
 
+export async function getReportGraph(reportId: string, depth = 3) {
+  return fetchJSON<{ nodes: any[]; edges: any[] }>(
+    `/api/v1/reports/${reportId}/graph?depth=${depth}`
+  );
+}
+
 export async function uploadReport(file: File) {
   const form = new FormData();
   form.append("file", file);
@@ -96,4 +102,43 @@ export async function uploadReport(file: File) {
   });
   if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
   return res.json();
+}
+
+// --- Jobs (graph-builder pipeline) ---
+export interface JobInfo {
+  task_id: string;
+  report_id: string;
+  status: string;
+  source_type: string;
+  error?: string;
+  result?: {
+    entities?: number;
+    metrics?: number;
+    metric_values?: number;
+    claims?: number;
+    relationships?: number;
+    edges?: number;
+    paragraphs?: number;
+    sections?: number;
+    reports?: number;
+    source_spans?: number;
+  };
+}
+
+export async function listJobs(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return fetchJSON<{
+    summary: { total: number; active: number; completed: number; failed: number };
+    jobs: JobInfo[];
+  }>(`/api/v1/jobs${qs}`);
+}
+
+export async function getReportStatus(reportId: string) {
+  return fetchJSON<{
+    report_id: string;
+    task_id: string;
+    status: string;
+    error?: string;
+    result?: JobInfo["result"];
+  }>(`/api/v1/reports/${reportId}/status`);
 }

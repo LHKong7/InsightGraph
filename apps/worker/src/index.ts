@@ -1,4 +1,4 @@
-import { Worker, Queue } from "bullmq";
+import { Worker } from "bullmq";
 import { getSettings } from "@insightgraph/core";
 import { parseDocument } from "./tasks/parse";
 import { buildGraph } from "./tasks/build-graph";
@@ -8,61 +8,44 @@ async function main() {
   const url = new URL(settings.redisUrl);
   const connection = { host: url.hostname, port: parseInt(url.port || "6379") };
 
-  const buildGraphQueue = new Queue("insightgraph-build-graph", { connection });
+  // Single worker that handles the full pipeline: parse -> extract -> write
+  const parseWorker = new Worker("insightgraph-parse", async (job) => {
+    // Step 1: Parse
+    const parseResult = await parseDocument(job);
+    console.log(`Parse complete for report ${job.data.reportId}`);
 
-  const parseWorker = new Worker("insightgraph-parse", parseDocument, {
-    connection,
-    concurrency: 2,
-  });
+    // Step 2: Build graph (inline, not via separate queue)
+    const { reportId } = parseResult as { reportId: string; documentIR: unknown };
+    const documentIR = (parseResult as Record<string, unknown>).documentIR;
 
-  const buildGraphWorker = new Worker("insightgraph-build-graph", buildGraph, {
+    if (documentIR) {
+      console.log(`Starting build-graph for report ${reportId}`);
+      const fakeJob = { data: { reportId, taskId: job.data.taskId, documentIR } } as any;
+      const graphResult = await buildGraph(fakeJob);
+      console.log(`Build graph complete:`, JSON.stringify(graphResult));
+      return { ...parseResult, graphResult };
+    }
+
+    return parseResult;
+  }, {
     connection,
     concurrency: 1,
+    lockDuration: 600_000, // 10 minutes for the full pipeline
   });
 
-  console.log("InsightGraph worker started");
-  console.log("  Parse queue: insightgraph-parse");
-  console.log("  Build graph queue: insightgraph-build-graph");
+  console.log("InsightGraph worker started (inline pipeline mode)");
+  console.log("  Queue: insightgraph-parse");
 
-  // Chain: parse completion -> build-graph job
-  parseWorker.on("completed", async (job) => {
-    console.log(`Parse job ${job.id} completed`);
-    const { reportId, documentIR } = job.returnvalue as {
-      reportId: string;
-      documentIR: unknown;
-    };
-    if (documentIR) {
-      console.log(`Enqueuing build-graph for report ${reportId}`);
-      await buildGraphQueue.add("build-graph", {
-        reportId,
-        taskId: job.data.taskId,
-        documentIR,
-      });
-    }
+  parseWorker.on("completed", (job) => {
+    console.log(`Pipeline job ${job.id} completed for report ${job.data.reportId}`);
   });
 
   parseWorker.on("failed", (job, err) => {
-    console.error(`Parse job ${job?.id} failed:`, err.message);
-  });
-
-  buildGraphWorker.on("completed", (job) => {
-    console.log(`Build graph job ${job.id} completed`);
-    if (job.returnvalue) {
-      const counts = job.returnvalue as Record<string, number>;
-      console.log(
-        `  Result: ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(", ")}`,
-      );
-    }
-  });
-
-  buildGraphWorker.on("failed", (job, err) => {
-    console.error(`Build graph job ${job?.id} failed:`, err.message);
+    console.error(`Pipeline job ${job?.id} failed:`, err.message);
   });
 
   process.on("SIGTERM", async () => {
-    await buildGraphQueue.close();
     await parseWorker.close();
-    await buildGraphWorker.close();
     process.exit(0);
   });
 }

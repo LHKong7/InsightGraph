@@ -1,14 +1,15 @@
 import type { Block, ExtractedClaim, ClaimType } from "@insightgraph/core";
 import { createLLMClient, chatJSON, CLAIM_TYPES } from "@insightgraph/core";
-import type OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { CLAIM_SYSTEM_PROMPT, formatClaimPrompt } from "./prompts/claim";
+import { createLimiter } from "./concurrency";
 
 const BATCH_SIZE = 5;
 const MAX_CONCURRENCY = 4;
 const VALID_CLAIM_TYPES = new Set<string>(CLAIM_TYPES);
 
 export class ClaimExtractor {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
   private batchSize: number;
 
@@ -19,8 +20,7 @@ export class ClaimExtractor {
   }
 
   async extract(blocks: Block[], context?: { title?: string }): Promise<ExtractedClaim[]> {
-    const pLimit = (await import("p-limit")).default;
-    const limit = pLimit(MAX_CONCURRENCY);
+    const limit = createLimiter(MAX_CONCURRENCY);
     const docTitle = context?.title ?? "Unknown";
 
     const batches = makeBatches(blocks, this.batchSize);

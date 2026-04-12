@@ -10,9 +10,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@insightgraph/core": "workspace:*",
-    "openai": "^4.70",
-    "p-limit": "^6.2"
+    "@insightgraph/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5",

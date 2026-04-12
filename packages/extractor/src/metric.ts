@@ -1,14 +1,15 @@
 import type { Block, ExtractedMetric } from "@insightgraph/core";
 import { createLLMClient, chatJSON } from "@insightgraph/core";
-import type OpenAI from "openai";
+import type { LLMClient } from "@insightgraph/core";
 import { METRIC_SYSTEM_PROMPT, formatMetricPrompt } from "./prompts/metric";
+import { createLimiter } from "./concurrency";
 
 const BATCH_SIZE = 5;
 const MAX_CONCURRENCY = 4;
 const HAS_DIGIT = /\d/;
 
 export class MetricExtractor {
-  private client: OpenAI;
+  private client: LLMClient;
   private model: string;
   private batchSize: number;
 
@@ -22,8 +23,7 @@ export class MetricExtractor {
     const numericBlocks = blocks.filter((b) => HAS_DIGIT.test(b.content));
     if (numericBlocks.length === 0) return [];
 
-    const pLimit = (await import("p-limit")).default;
-    const limit = pLimit(MAX_CONCURRENCY);
+    const limit = createLimiter(MAX_CONCURRENCY);
     const docTitle = context?.title ?? "Unknown";
 
     const batches = makeBatches(numericBlocks, this.batchSize);
