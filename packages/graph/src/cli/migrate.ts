@@ -17,6 +17,7 @@
 import { createSettings, type GraphBackend } from "@insightgraph/core";
 import { Neo4jGraphStore } from "../neo4j/store";
 import { SqliteGraphStore } from "../sqlite/store";
+import { FalkorGraphStore } from "../falkor/store";
 import { migrateGraph } from "../merge/migrate";
 import {
   DEFAULT_MERGE_POLICY,
@@ -72,6 +73,8 @@ function parseArgs(argv: string[]): { from: GraphBackend; to: GraphBackend; poli
 function buildStore(kind: GraphBackend): GraphStore {
   const settings = createSettings({ graphBackend: kind });
   if (kind === "sqlite") return new SqliteGraphStore(settings.sqlitePath);
+  if (kind === "falkor")
+    return new FalkorGraphStore(settings.falkorPath, settings.falkorGraphName);
   return new Neo4jGraphStore(
     settings.neo4jUri,
     settings.neo4jUser,

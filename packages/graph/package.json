@@ -14,12 +14,14 @@
   "dependencies": {
     "@insightgraph/core": "workspace:*",
     "better-sqlite3": "^11.5.0",
+    "falkordb": "^6.6.2",
+    "falkordblite": "^0.2.0",
     "neo4j-driver": "^5.27"
   },
   "devDependencies": {
-    "typescript": "^5.5",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.0"
+    "@types/node": "^22.0",
+    "typescript": "^5.5"
   },
   "license": "MIT",
   "files": [

@@ -14,8 +14,13 @@ async function main() {
     await store.verifyConnectivity();
     if (store.kind === "neo4j") {
       console.log(`Connected to Neo4j at ${settings.neo4jUri}`);
-    } else {
+    } else if (store.kind === "sqlite") {
       console.log(`Opened SQLite graph store at ${settings.sqlitePath}`);
+    } else if (store.kind === "falkor") {
+      console.log(
+        `Opened embedded FalkorDB at ${settings.falkorPath} ` +
+          `(graph: ${settings.falkorGraphName})`,
+      );
     }
   } catch (err) {
     console.warn(

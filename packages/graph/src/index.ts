@@ -1,6 +1,7 @@
 import type { Settings } from "@insightgraph/core";
 import { Neo4jGraphStore } from "./neo4j/store";
 import { SqliteGraphStore } from "./sqlite/store";
+import { FalkorGraphStore } from "./falkor/store";
 import type { GraphStore } from "./types";
 
 // -- Public type re-exports ---------------------------------------------------
@@ -40,6 +41,12 @@ export { SqliteGraphReader } from "./sqlite/reader";
 export { SqliteGraphWriter } from "./sqlite/writer";
 export { SqliteGraphStore } from "./sqlite/store";
 
+// -- FalkorDB backend ---------------------------------------------------------
+export { FalkorConnection } from "./falkor/connection";
+export { FalkorGraphReader } from "./falkor/reader";
+export { FalkorGraphWriter } from "./falkor/writer";
+export { FalkorGraphStore } from "./falkor/store";
+
 // -- Merge utilities ----------------------------------------------------------
 export { mergeSqliteStore } from "./merge/sqlite-merger";
 export { migrateGraph } from "./merge/migrate";
@@ -55,6 +62,9 @@ export { migrateGraph } from "./merge/migrate";
 export function createGraphStore(settings: Settings): GraphStore {
   if (settings.graphBackend === "sqlite") {
     return new SqliteGraphStore(settings.sqlitePath);
+  }
+  if (settings.graphBackend === "falkor") {
+    return new FalkorGraphStore(settings.falkorPath, settings.falkorGraphName);
   }
   return new Neo4jGraphStore(
     settings.neo4jUri,

@@ -118,7 +118,7 @@ export const DEFAULT_MERGE_POLICY: MergePolicy = {
   conflictLog: false,
 };
 
-export type GraphBackend = "neo4j" | "sqlite";
+export type GraphBackend = "neo4j" | "sqlite" | "falkor";
 
 /**
  * A self-contained graph store facade. Produced by `createGraphStore()` in

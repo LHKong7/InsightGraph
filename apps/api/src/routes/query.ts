@@ -74,9 +74,12 @@ queryRoutes.get("/reports/:reportId/graph", async (c) => {
   const reportId = c.req.param("reportId");
   const depth = Math.max(1, Math.min(parseInt(c.req.query("depth") ?? "3"), 5));
 
-  if (store.kind === "sqlite") {
-    // SQLite fallback: call getSubgraph from the Report node. It walks typed
-    // edges and produces the same { nodes, edges } shape as Neo4j.
+  if (store.kind !== "neo4j") {
+    // Non-Neo4j backends (SQLite / FalkorDB) don't run the bespoke Cypher
+    // query below — SQLite because it doesn't speak Cypher, FalkorDB because
+    // some Neo4j-only functions (`elementId`) aren't available. Both backends
+    // provide the same { nodes, edges } shape via the generic getSubgraph
+    // reader method, so we use that as a portable fallback.
     const reader = store.reader();
     const result = await reader.getSubgraph(reportId, depth);
     return c.json(result);
