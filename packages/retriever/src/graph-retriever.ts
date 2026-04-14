@@ -1,13 +1,16 @@
-import { GraphReader } from "@insightgraph/graph";
+import type { IGraphReader } from "@insightgraph/graph";
 
 /**
- * High-level graph retrieval wrapping GraphReader with result formatting.
+ * High-level graph retrieval wrapping a GraphReader with result formatting.
+ *
+ * Accepts the backend-agnostic GraphReader interface so this class works with
+ * both the Neo4j and SQLite implementations.
  */
 export class GraphRetriever {
   /** Exposed so other classes (AgentTools, HybridRetriever) can call reader methods directly. */
-  readonly _reader: GraphReader;
+  readonly _reader: IGraphReader;
 
-  constructor(reader: GraphReader) {
+  constructor(reader: IGraphReader) {
     this._reader = reader;
   }
 

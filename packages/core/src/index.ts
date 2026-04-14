@@ -5,7 +5,7 @@ export {
   createSettings,
   resetSettings,
 } from "./config";
-export type { Settings } from "./config";
+export type { Settings, GraphBackend } from "./config";
 
 // Types
 export {

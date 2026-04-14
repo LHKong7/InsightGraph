@@ -1,45 +1,47 @@
 import { serve } from "@hono/node-server";
-import { getSettings } from "@insightgraph/core";
-import { loadOntology } from "@insightgraph/core";
-import { Neo4jConnection, ensureSchema } from "@insightgraph/graph";
+import { getSettings, loadOntology } from "@insightgraph/core";
+import { createGraphStore } from "@insightgraph/graph";
 import { createApp } from "./app";
 
 async function main() {
   const settings = getSettings();
   const ontology = loadOntology();
 
-  // Initialize Neo4j
-  const neo4j = new Neo4jConnection(
-    settings.neo4jUri,
-    settings.neo4jUser,
-    settings.neo4jPassword,
-  );
+  // Select graph backend from settings (IG_GRAPH_BACKEND: neo4j|sqlite).
+  const store = createGraphStore(settings);
 
   try {
-    await neo4j.verifyConnectivity();
-    console.log(`Connected to Neo4j at ${settings.neo4jUri}`);
+    await store.verifyConnectivity();
+    if (store.kind === "neo4j") {
+      console.log(`Connected to Neo4j at ${settings.neo4jUri}`);
+    } else {
+      console.log(`Opened SQLite graph store at ${settings.sqlitePath}`);
+    }
   } catch (err) {
-    console.warn("Neo4j connectivity check failed:", (err as Error).message);
-    console.warn("Will attempt queries anyway — Neo4j may still work.");
+    console.warn(
+      `Graph connectivity check failed (${store.kind}):`,
+      (err as Error).message,
+    );
+    console.warn("Will attempt queries anyway — backend may still work.");
   }
 
   // Ensure graph schema
   try {
-    await ensureSchema(neo4j, ontology);
+    await store.ensureSchema(ontology);
     console.log("Graph schema ensured");
   } catch (err) {
     console.warn("Could not ensure graph schema:", (err as Error).message);
   }
 
-  const app = createApp(neo4j, settings);
+  const app = createApp(store, settings);
 
   const port = 8000;
-  console.log(`InsightGraph API starting on port ${port}`);
+  console.log(`InsightGraph API starting on port ${port} (backend: ${store.kind})`);
   serve({ fetch: app.fetch, port });
 
   // Graceful shutdown
   process.on("SIGTERM", async () => {
-    await neo4j.close();
+    await store.close();
     process.exit(0);
   });
 }

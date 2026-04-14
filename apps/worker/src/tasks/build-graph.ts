@@ -4,7 +4,7 @@ import {
   loadDomainConfig,
 } from "@insightgraph/core";
 import type { DocumentIR, ExtractionResult } from "@insightgraph/core";
-import { Neo4jConnection, GraphWriter } from "@insightgraph/graph";
+import { createGraphStore } from "@insightgraph/graph";
 import { ExtractionPipeline } from "@insightgraph/extractor";
 import { ResolverService } from "@insightgraph/resolver";
 
@@ -44,18 +44,24 @@ export async function buildGraph(job: Job<BuildGraphJobData>): Promise<Record<st
   extractions = await resolver.resolve(extractions);
   console.log(`[build-graph] Resolution done: ${extractions.resolvedEntities.length} resolved entities`);
 
-  // Write to Neo4j
-  const conn = new Neo4jConnection(
-    settings.neo4jUri,
-    settings.neo4jUser,
-    settings.neo4jPassword,
-  );
+  // Write to the configured graph backend (Neo4j or SQLite).
+  const store = createGraphStore(settings);
   try {
-    const writer = new GraphWriter(conn);
+    // Make sure schema is in place — cheap no-op on Neo4j if it already exists,
+    // and required for SQLite on the very first run.
+    try {
+      await store.ensureSchema();
+    } catch {
+      // non-fatal; legacy deployments may not have constraints privileges
+    }
+    const writer = store.writer();
     const result = await writer.writeDocument(doc, extractions);
-    console.log(`[build-graph] Graph written:`, JSON.stringify(result));
+    console.log(
+      `[build-graph] Graph written (backend: ${store.kind}):`,
+      JSON.stringify(result),
+    );
     return result;
   } finally {
-    await conn.close();
+    await store.close();
   }
 }

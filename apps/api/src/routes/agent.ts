@@ -22,17 +22,16 @@ agentRoutes.post("/agent/query", async (c) => {
   }>();
 
   const settings = c.get("settings");
-  const neo4j = c.get("neo4j");
+  const store = c.get("store");
 
   if (!settings.llmApiKey) {
     return c.json({ error: "LLM API key required" }, 400);
   }
 
   const { Orchestrator } = await import("@insightgraph/agent-runtime");
-  const { GraphReader } = await import("@insightgraph/graph");
   const { GraphRetriever, AgentTools } = await import("@insightgraph/retriever");
 
-  const reader = new GraphReader(neo4j);
+  const reader = store.reader();
   const graphRetriever = new GraphRetriever(reader);
   const agentTools = new AgentTools(graphRetriever);
 
