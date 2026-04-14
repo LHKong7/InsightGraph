@@ -3,31 +3,35 @@ import { createLLMClient, chatJSON } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { formatEntityPrompt, formatEntitySystemPrompt } from "./prompts/entity";
 import { createLimiter } from "./concurrency";
-
-const BATCH_SIZE = 5;
-const MAX_CONCURRENCY = 4;
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_MAX_CONCURRENCY,
+  type ExtractorOptions,
+} from "./options";
 
 export class EntityExtractor {
   private client: LLMClient;
   private model: string;
   private batchSize: number;
+  private maxConcurrency: number;
 
   constructor(
     model: string,
     apiKey: string,
     baseUrl = "",
-    batchSize = BATCH_SIZE,
+    options: ExtractorOptions = {},
   ) {
     this.client = createLLMClient(apiKey, baseUrl || undefined);
     this.model = model;
-    this.batchSize = batchSize;
+    this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
+    this.maxConcurrency = options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
   }
 
   async extract(
     blocks: Block[],
     context?: { title?: string; domain?: DomainConfig },
   ): Promise<ExtractedEntity[]> {
-    const limit = createLimiter(MAX_CONCURRENCY);
+    const limit = createLimiter(this.maxConcurrency);
     const docTitle = context?.title ?? "Unknown";
     const domainInstructions = context?.domain?.extractionInstructions ?? "";
     const entityTypes = context?.domain?.entityTypes;

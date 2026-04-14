@@ -25,12 +25,19 @@ export async function buildGraph(job: Job<BuildGraphJobData>): Promise<Record<st
   console.log(`[build-graph] Starting extraction for report ${reportId}`);
   console.log(`[build-graph] Model: ${settings.llmModel}, Sections: ${doc.sections?.length ?? 0}`);
 
-  // Extract
+  // Extract. Extractor concurrency + batch size come from settings so they
+  // can be tuned via IG_EXTRACTION_BATCH_SIZE / IG_EXTRACTION_MAX_CONCURRENCY
+  // without code changes. See packages/extractor/src/pipeline.ts for the
+  // two-phase parallelism model.
   const pipeline = new ExtractionPipeline(
     settings.llmModel,
     settings.llmApiKey,
     settings.llmBaseUrl,
     domainConfig,
+    {
+      batchSize: settings.extractionBatchSize,
+      maxConcurrency: settings.extractionMaxConcurrency,
+    },
   );
   let extractions: ExtractionResult = await pipeline.extract(doc);
   console.log(`[build-graph] Extraction done: ${extractions.entities.length} entities, ${extractions.metrics.length} metrics, ${extractions.claims.length} claims, ${extractions.relationships.length} relationships`);
