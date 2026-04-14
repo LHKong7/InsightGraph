@@ -1,5 +1,5 @@
 import { createLLMClient, chatJSON } from "@insightgraph/core";
-import { GraphReader } from "@insightgraph/graph";
+import type { IGraphReader } from "@insightgraph/graph";
 import type { LLMClient } from "@insightgraph/core";
 
 /**
@@ -7,12 +7,12 @@ import type { LLMClient } from "@insightgraph/core";
  * and contradictions.
  */
 export class CrossReportAnalyzer {
-  private reader: GraphReader;
+  private reader: IGraphReader;
   private client: LLMClient;
   private model: string;
 
   constructor(
-    reader: GraphReader,
+    reader: IGraphReader,
     model = "gpt-4o-mini",
     apiKey = "",
     baseUrl?: string,

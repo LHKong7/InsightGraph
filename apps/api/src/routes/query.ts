@@ -1,12 +1,10 @@
 import { Hono } from "hono";
-import { GraphReader } from "@insightgraph/graph";
 import type { AppState } from "../app";
 
 export const queryRoutes = new Hono<AppState>();
 
 queryRoutes.get("/entities/search", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const name = c.req.query("name");
   const entityType = c.req.query("entity_type");
   const limit = parseInt(c.req.query("limit") ?? "50");
@@ -16,38 +14,33 @@ queryRoutes.get("/entities/search", async (c) => {
 });
 
 queryRoutes.get("/entities/:entityId", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const entity = await reader.getEntity(c.req.param("entityId"));
   if (!entity) return c.json({ error: "Entity not found" }, 404);
   return c.json(entity);
 });
 
 queryRoutes.get("/entities/:entityId/claims", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   // entityId here is actually entity_name in the Python API
   const results = await reader.getClaimsAbout(c.req.param("entityId"));
   return c.json(results);
 });
 
 queryRoutes.get("/entities/:entityId/metrics", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const results = await reader.getEntityMetrics(c.req.param("entityId"));
   return c.json(results);
 });
 
 queryRoutes.get("/claims/:claimId/evidence", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const results = await reader.findEvidenceForClaim(c.req.param("claimId"));
   return c.json(results);
 });
 
 queryRoutes.get("/subgraph/question", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const nodeId = c.req.query("node_id");
   const depth = parseInt(c.req.query("depth") ?? "2");
   if (!nodeId) return c.json({ error: "node_id required" }, 400);
@@ -56,25 +49,49 @@ queryRoutes.get("/subgraph/question", async (c) => {
 });
 
 queryRoutes.get("/reports", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const reports = await reader.listReports();
   return c.json(reports);
 });
 
 queryRoutes.get("/reports/:reportId", async (c) => {
-  const neo4j = c.get("neo4j");
-  const reader = new GraphReader(neo4j);
+  const reader = c.get("store").reader();
   const report = await reader.getReport(c.req.param("reportId"));
   if (!report) return c.json({ error: "Report not found" }, 404);
   return c.json(report);
 });
 
-/** Get the full subgraph for one report (Report node + all connected entities/claims/metrics). */
+/**
+ * Get the full subgraph for one report (Report node + all connected
+ * entities/claims/metrics). Implemented with backend-specific code paths:
+ *   - Neo4j: runs a tailored Cypher query (original behavior preserved).
+ *   - SQLite: uses GraphReader.getSubgraph, which walks via a recursive CTE.
+ *
+ * On SQLite we still honor the `depth` query parameter.
+ */
 queryRoutes.get("/reports/:reportId/graph", async (c) => {
-  const neo4j = c.get("neo4j");
+  const store = c.get("store");
   const reportId = c.req.param("reportId");
   const depth = Math.max(1, Math.min(parseInt(c.req.query("depth") ?? "3"), 5));
+
+  if (store.kind !== "neo4j") {
+    // Non-Neo4j backends (SQLite / FalkorDB) don't run the bespoke Cypher
+    // query below — SQLite because it doesn't speak Cypher, FalkorDB because
+    // some Neo4j-only functions (`elementId`) aren't available. Both backends
+    // provide the same { nodes, edges } shape via the generic getSubgraph
+    // reader method, so we use that as a portable fallback.
+    const reader = store.reader();
+    const result = await reader.getSubgraph(reportId, depth);
+    return c.json(result);
+  }
+
+  const neo4j = c.get("neo4j");
+  if (!neo4j) {
+    return c.json(
+      { error: `Raw Cypher endpoint not available on backend '${store.kind}'` },
+      501,
+    );
+  }
 
   // Custom query that walks from the Report node through structure + semantic edges.
   // We intentionally skip the huge SourceSpan/Paragraph fan-out by default so the

@@ -1,16 +1,24 @@
-import { getSettings, loadOntology } from "@insightgraph/core";
-import { Neo4jConnection, ensureSchema, GraphReader } from "@insightgraph/graph";
+import { getSettings } from "@insightgraph/core";
+import {
+  createGraphStore,
+  type GraphStore,
+  type IGraphReader,
+} from "@insightgraph/graph";
 
-let _conn: Neo4jConnection | null = null;
-let _reader: GraphReader | null = null;
+let _store: GraphStore | null = null;
+let _reader: IGraphReader | null = null;
 
-async function getReader(): Promise<GraphReader> {
+async function getReader(): Promise<IGraphReader> {
   if (_reader) return _reader;
   const settings = getSettings();
-  _conn = new Neo4jConnection(settings.neo4jUri, settings.neo4jUser, settings.neo4jPassword);
-  await _conn.verifyConnectivity();
-  await ensureSchema(_conn);
-  _reader = new GraphReader(_conn);
+  _store = createGraphStore(settings);
+  try {
+    await _store.verifyConnectivity();
+  } catch {
+    // continue — ensureSchema will surface a clearer error
+  }
+  await _store.ensureSchema();
+  _reader = _store.reader();
   return _reader;
 }
 
@@ -174,5 +182,5 @@ export async function handleToolCall(
 }
 
 export async function cleanup(): Promise<void> {
-  if (_conn) await _conn.close();
+  if (_store) await _store.close();
 }

@@ -3,29 +3,44 @@ import { createLLMClient, chatJSON } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { RELATIONSHIP_SYSTEM_PROMPT, formatRelationshipPrompt } from "./prompts/relationship";
 import { createLimiter } from "./concurrency";
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_MAX_CONCURRENCY,
+  type ExtractorOptions,
+} from "./options";
 
-const BATCH_SIZE = 5;
-const MAX_CONCURRENCY = 4;
 const REL_TYPE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 export class RelationshipExtractor {
   private client: LLMClient;
   private model: string;
   private batchSize: number;
+  private maxConcurrency: number;
 
-  constructor(model: string, apiKey: string, baseUrl = "", batchSize = BATCH_SIZE) {
+  constructor(
+    model: string,
+    apiKey: string,
+    baseUrl = "",
+    options: ExtractorOptions = {},
+  ) {
     this.client = createLLMClient(apiKey, baseUrl || undefined);
     this.model = model;
-    this.batchSize = batchSize;
+    this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
+    this.maxConcurrency = options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
   }
 
   async extract(
     blocks: Block[],
     context?: { title?: string; entityNames?: string[] },
   ): Promise<ExtractedRelationship[]> {
-    const limit = createLimiter(MAX_CONCURRENCY);
-    const docTitle = context?.title ?? "Unknown";
     const entityNames = context?.entityNames ?? [];
+    // Relationship extraction requires at least two entities — otherwise every
+    // LLM response will be filtered out by the post-check at parseRelationships,
+    // and we'd be burning money/time for guaranteed-empty results.
+    if (entityNames.length < 2) return [];
+
+    const limit = createLimiter(this.maxConcurrency);
+    const docTitle = context?.title ?? "Unknown";
     const entityNamesLower = new Set(entityNames.map((n) => n.toLowerCase()));
 
     const batches = makeBatches(blocks, this.batchSize);

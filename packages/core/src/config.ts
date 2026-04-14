@@ -3,7 +3,15 @@ import { config } from "dotenv";
 // Load .env file from the working directory
 config();
 
+export type GraphBackend = "neo4j" | "sqlite" | "falkor";
+
 export interface Settings {
+  graphBackend: GraphBackend;
+  sqlitePath: string;
+  /** Directory where the embedded FalkorDB persists data. */
+  falkorPath: string;
+  /** Name of the graph within FalkorDB (a single DB instance can host many). */
+  falkorGraphName: string;
   neo4jUri: string;
   neo4jUser: string;
   neo4jPassword: string;
@@ -30,8 +38,19 @@ function envInt(key: string, defaultValue: number): number {
 }
 
 /** Build a Settings object from env vars (no cache). */
+function envBackend(): GraphBackend {
+  const raw = (process.env.IG_GRAPH_BACKEND ?? "neo4j").toLowerCase();
+  if (raw === "sqlite" || raw === "neo4j" || raw === "falkor") return raw;
+  // Unknown value — fall back to neo4j rather than crashing at import time.
+  return "neo4j";
+}
+
 function envDefaults(): Settings {
   return {
+    graphBackend: envBackend(),
+    sqlitePath: envStr("IG_SQLITE_PATH", "./data/insightgraph.sqlite"),
+    falkorPath: envStr("IG_FALKOR_PATH", "./data/falkor"),
+    falkorGraphName: envStr("IG_FALKOR_GRAPH_NAME", "insightgraph"),
     neo4jUri: envStr("IG_NEO4J_URI", "bolt://localhost:7687"),
     neo4jUser: envStr("IG_NEO4J_USER", "neo4j"),
     neo4jPassword: envStr("IG_NEO4J_PASSWORD", "insightgraph"),

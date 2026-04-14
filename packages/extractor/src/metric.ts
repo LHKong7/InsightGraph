@@ -3,27 +3,37 @@ import { createLLMClient, chatJSON } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { METRIC_SYSTEM_PROMPT, formatMetricPrompt } from "./prompts/metric";
 import { createLimiter } from "./concurrency";
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_MAX_CONCURRENCY,
+  type ExtractorOptions,
+} from "./options";
 
-const BATCH_SIZE = 5;
-const MAX_CONCURRENCY = 4;
 const HAS_DIGIT = /\d/;
 
 export class MetricExtractor {
   private client: LLMClient;
   private model: string;
   private batchSize: number;
+  private maxConcurrency: number;
 
-  constructor(model: string, apiKey: string, baseUrl = "", batchSize = BATCH_SIZE) {
+  constructor(
+    model: string,
+    apiKey: string,
+    baseUrl = "",
+    options: ExtractorOptions = {},
+  ) {
     this.client = createLLMClient(apiKey, baseUrl || undefined);
     this.model = model;
-    this.batchSize = batchSize;
+    this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
+    this.maxConcurrency = options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
   }
 
   async extract(blocks: Block[], context?: { title?: string }): Promise<ExtractedMetric[]> {
     const numericBlocks = blocks.filter((b) => HAS_DIGIT.test(b.content));
     if (numericBlocks.length === 0) return [];
 
-    const limit = createLimiter(MAX_CONCURRENCY);
+    const limit = createLimiter(this.maxConcurrency);
     const docTitle = context?.title ?? "Unknown";
 
     const batches = makeBatches(numericBlocks, this.batchSize);

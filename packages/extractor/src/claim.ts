@@ -3,24 +3,34 @@ import { createLLMClient, chatJSON, CLAIM_TYPES } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { CLAIM_SYSTEM_PROMPT, formatClaimPrompt } from "./prompts/claim";
 import { createLimiter } from "./concurrency";
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_MAX_CONCURRENCY,
+  type ExtractorOptions,
+} from "./options";
 
-const BATCH_SIZE = 5;
-const MAX_CONCURRENCY = 4;
 const VALID_CLAIM_TYPES = new Set<string>(CLAIM_TYPES);
 
 export class ClaimExtractor {
   private client: LLMClient;
   private model: string;
   private batchSize: number;
+  private maxConcurrency: number;
 
-  constructor(model: string, apiKey: string, baseUrl = "", batchSize = BATCH_SIZE) {
+  constructor(
+    model: string,
+    apiKey: string,
+    baseUrl = "",
+    options: ExtractorOptions = {},
+  ) {
     this.client = createLLMClient(apiKey, baseUrl || undefined);
     this.model = model;
-    this.batchSize = batchSize;
+    this.batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
+    this.maxConcurrency = options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
   }
 
   async extract(blocks: Block[], context?: { title?: string }): Promise<ExtractedClaim[]> {
-    const limit = createLimiter(MAX_CONCURRENCY);
+    const limit = createLimiter(this.maxConcurrency);
     const docTitle = context?.title ?? "Unknown";
 
     const batches = makeBatches(blocks, this.batchSize);

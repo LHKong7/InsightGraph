@@ -52,6 +52,10 @@ export async function runPipeline(
     settings.llmApiKey,
     settings.llmBaseUrl,
     domainConfig,
+    {
+      batchSize: settings.extractionBatchSize,
+      maxConcurrency: settings.extractionMaxConcurrency,
+    },
   );
   let extractions = await pipeline.extract(doc);
 
