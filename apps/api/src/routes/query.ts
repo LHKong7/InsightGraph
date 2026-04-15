@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppState } from "../app";
+import { parseIntParam } from "../lib/validators";
 
 export const queryRoutes = new Hono<AppState>();
 
@@ -7,7 +8,11 @@ queryRoutes.get("/entities/search", async (c) => {
   const reader = c.get("store").reader();
   const name = c.req.query("name");
   const entityType = c.req.query("entity_type");
-  const limit = parseInt(c.req.query("limit") ?? "50");
+  const limit = parseIntParam("limit", c.req.query("limit"), {
+    min: 1,
+    max: 1000,
+    default: 50,
+  });
 
   const results = await reader.findEntities(name, entityType, limit);
   return c.json(results);
@@ -42,7 +47,11 @@ queryRoutes.get("/claims/:claimId/evidence", async (c) => {
 queryRoutes.get("/subgraph/question", async (c) => {
   const reader = c.get("store").reader();
   const nodeId = c.req.query("node_id");
-  const depth = parseInt(c.req.query("depth") ?? "2");
+  const depth = parseIntParam("depth", c.req.query("depth"), {
+    min: 1,
+    max: 5,
+    default: 2,
+  });
   if (!nodeId) return c.json({ error: "node_id required" }, 400);
   const result = await reader.getSubgraph(nodeId, depth);
   return c.json(result);
@@ -72,7 +81,11 @@ queryRoutes.get("/reports/:reportId", async (c) => {
 queryRoutes.get("/reports/:reportId/graph", async (c) => {
   const store = c.get("store");
   const reportId = c.req.param("reportId");
-  const depth = Math.max(1, Math.min(parseInt(c.req.query("depth") ?? "3"), 5));
+  const depth = parseIntParam("depth", c.req.query("depth"), {
+    min: 1,
+    max: 5,
+    default: 3,
+  });
 
   if (store.kind !== "neo4j") {
     // Non-Neo4j backends (SQLite / FalkorDB) don't run the bespoke Cypher

@@ -22,7 +22,12 @@ function apiToGraphData(raw: { nodes: any[]; edges: any[] }): GraphData {
       props.metric_id ||
       props.value_id ||
       props.section_id ||
-      String(Math.random());
+      // Prefer a collision-resistant UUID for synthetic ids. `crypto.randomUUID`
+      // is available in all modern browsers; fall back to Math.random only if
+      // it's somehow missing (e.g. very old environments).
+      (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `synthetic-${Math.random().toString(36).slice(2)}`);
     const label =
       props.canonical_name ||
       props.name ||

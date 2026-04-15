@@ -1,5 +1,5 @@
 import type { ExtractedEntity, ResolvedEntity } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 
 const RESOLUTION_PROMPT = `You are an entity resolution system. Given a list of entity mentions extracted from a document, identify which mentions refer to the same real-world entity.
@@ -83,7 +83,8 @@ export class EntityResolver {
 
     try {
       return await this.llmResolve(unique, groups);
-    } catch {
+    } catch (err) {
+      console.warn(`[entity-resolver] LLM resolve failed: ${(err as Error).message}`);
       return groupsToResolved(groups);
     }
   }
@@ -101,8 +102,16 @@ export class EntityResolver {
       { role: "user", content: RESOLUTION_PROMPT + entityList },
     ]);
 
-    const data = JSON.parse(raw);
+    const data = safeParseLlmJson<{
+      groups?: Array<{
+        canonical_name?: string;
+        aliases?: string[];
+        type?: string;
+        description?: string;
+      }>;
+    }>(raw, { context: "entity-resolver", validate: isRecord });
     const resolved: ResolvedEntity[] = [];
+    if (!data) return resolved;
 
     for (const group of data.groups ?? []) {
       if (!group.canonical_name) continue;

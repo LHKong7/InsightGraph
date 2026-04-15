@@ -11,6 +11,25 @@ import type { ImportStats, MergePolicy } from "../types";
 import { DEFAULT_MERGE_POLICY } from "../types";
 
 /**
+ * Parse the JSON-encoded `aliases` column. Corrupt/legacy rows should not
+ * abort an entire merge — log and degrade to an empty alias list instead.
+ */
+function parseAliasesColumn(raw: string | null, entityId: string): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? (v as string[]) : [];
+  } catch (err) {
+    console.warn(
+      `[sqlite-merger] failed to parse aliases for entity ${entityId}: ${
+        (err as Error).message
+      }. Falling back to empty array.`,
+    );
+    return [];
+  }
+}
+
+/**
  * Merge a source SQLite graph file into a target SQLite graph file. Uses
  * `ATTACH DATABASE` so both graphs can be joined inside a single transaction,
  * remapping entity/metric UUIDs when the target already has a row under the
@@ -94,7 +113,7 @@ export function mergeSqliteStore(
       `INSERT OR REPLACE INTO _entity_remap(src_id, tgt_id) VALUES (?, ?)`,
     );
     for (const row of srcEntities) {
-      const aliases = row.aliases ? (JSON.parse(row.aliases) as string[]) : [];
+      const aliases = parseAliasesColumn(row.aliases, row.entity_id);
       const existing = stmts.getEntityIdByCanon.get(
         row.canonical_name,
         row.entity_type,
@@ -126,9 +145,10 @@ export function mergeSqliteStore(
       }
 
       // Conflict — apply policy.
-      const existingAliases = existing.aliases
-        ? (JSON.parse(existing.aliases) as string[])
-        : [];
+      const existingAliases = parseAliasesColumn(
+        existing.aliases,
+        existing.entity_id,
+      );
       const newDescription = mergeDescription(
         existing.description,
         row.description,

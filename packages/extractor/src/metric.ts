@@ -1,5 +1,5 @@
 import type { Block, ExtractedMetric } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { METRIC_SYSTEM_PROMPT, formatMetricPrompt } from "./prompts/metric";
 import { createLimiter } from "./concurrency";
@@ -64,33 +64,45 @@ export class MetricExtractor {
         { role: "user", content: formatMetricPrompt(combinedText, docTitle, sectionTitle) },
       ]);
       return parseMetrics(raw, blockIds);
-    } catch {
+    } catch (err) {
+      console.warn(`[metric-extractor] LLM call failed: ${(err as Error).message}`);
       return [];
     }
   }
 }
 
 function parseMetrics(rawJson: string, blockIds: string[]): ExtractedMetric[] {
-  try {
-    const data = JSON.parse(rawJson);
-    const metrics: ExtractedMetric[] = [];
-    for (const m of data.metrics ?? []) {
-      const value = typeof m.value === "number" ? m.value : parseFloat(m.value);
-      if (!m.name || isNaN(value)) continue;
-      metrics.push({
-        name: m.name,
-        value,
-        unit: m.unit ?? undefined,
-        period: m.period ?? undefined,
-        entityName: m.entity_name ?? undefined,
-        sourceBlockId: blockIds[0],
-        sourceText: m.source_text ?? "",
-      });
+  if (blockIds.length === 0) return [];
+  const data = safeParseLlmJson<{ metrics?: Array<Record<string, unknown>> }>(
+    rawJson,
+    { context: "metric-extractor", validate: isRecord },
+  );
+  if (!data) return [];
+
+  const metrics: ExtractedMetric[] = [];
+  for (const m of data.metrics ?? []) {
+    // Reject values that aren't coercible to a finite number (e.g. undefined,
+    // null, non-numeric strings). parseFloat(undefined) silently yields NaN.
+    let value: number;
+    if (typeof m.value === "number") {
+      value = m.value;
+    } else if (typeof m.value === "string" && m.value.trim() !== "") {
+      value = parseFloat(m.value);
+    } else {
+      continue;
     }
-    return metrics;
-  } catch {
-    return [];
+    if (!m.name || !Number.isFinite(value)) continue;
+    metrics.push({
+      name: m.name as string,
+      value,
+      unit: (m.unit as string | undefined) ?? undefined,
+      period: (m.period as string | undefined) ?? undefined,
+      entityName: (m.entity_name as string | undefined) ?? undefined,
+      sourceBlockId: blockIds[0],
+      sourceText: (m.source_text as string | undefined) ?? "",
+    });
   }
+  return metrics;
 }
 
 function makeBatches<T>(items: T[], size: number): T[][] {

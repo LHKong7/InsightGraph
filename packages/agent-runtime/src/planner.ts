@@ -1,5 +1,5 @@
 import type { LLMClient } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 
 export const PLANNER_SYSTEM_PROMPT = `You are a query planner for InsightGraph, a graph-first knowledge system built from reports.
 
@@ -76,6 +76,17 @@ export class Planner {
       userContent = `${context}\n\nNew question: ${question}`;
     }
 
+    const fallbackPlan: PlanResult = {
+      questionType: "general",
+      toolPlan: [
+        {
+          tool: "get_subgraph_for_question",
+          args: { question },
+        },
+      ],
+      reasoning: "Fallback to subgraph retrieval",
+    };
+
     try {
       const raw = await chatJSON(
         this.client,
@@ -86,24 +97,23 @@ export class Planner {
         ],
         0.0,
       );
-      const parsed = JSON.parse(raw);
+      const parsed = safeParseLlmJson<Record<string, unknown>>(raw, {
+        context: "planner",
+        validate: isRecord,
+      });
+      if (!parsed) return fallbackPlan;
       return {
-        questionType: parsed.question_type ?? "general",
-        toolPlan: parsed.tool_plan ?? [],
-        reasoning: parsed.reasoning ?? "",
+        questionType: (parsed.question_type as string) ?? "general",
+        toolPlan:
+          (parsed.tool_plan as Array<{
+            tool: string;
+            args: Record<string, unknown>;
+          }>) ?? [],
+        reasoning: (parsed.reasoning as string) ?? "",
       };
-    } catch {
-      console.warn("Planner failed, using default plan");
-      return {
-        questionType: "general",
-        toolPlan: [
-          {
-            tool: "get_subgraph_for_question",
-            args: { question },
-          },
-        ],
-        reasoning: "Fallback to subgraph retrieval",
-      };
+    } catch (err) {
+      console.warn(`[planner] chat failed: ${(err as Error).message}`);
+      return fallbackPlan;
     }
   }
 }

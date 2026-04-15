@@ -1,5 +1,5 @@
 import type { Block, ExtractedEntity, DomainConfig } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { formatEntityPrompt, formatEntitySystemPrompt } from "./prompts/entity";
 import { createLimiter } from "./concurrency";
@@ -82,23 +82,27 @@ export class EntityExtractor {
 }
 
 function parseEntities(rawJson: string, blockIds: string[]): ExtractedEntity[] {
-  try {
-    const data = JSON.parse(rawJson);
-    const entities: ExtractedEntity[] = [];
-    for (const e of data.entities ?? []) {
-      if (!e.name || !e.type) continue;
-      entities.push({
-        name: e.name,
-        type: e.type,
-        description: e.description ?? undefined,
-        sourceBlockId: blockIds[0],
-        sourceText: e.source_text ?? "",
-      });
-    }
-    return entities;
-  } catch {
-    return [];
+  // Empty batch: we have no block to attribute extractions to, so bail out.
+  if (blockIds.length === 0) return [];
+
+  const data = safeParseLlmJson<{ entities?: Array<Record<string, unknown>> }>(
+    rawJson,
+    { context: "entity-extractor", validate: isRecord },
+  );
+  if (!data) return [];
+
+  const entities: ExtractedEntity[] = [];
+  for (const e of data.entities ?? []) {
+    if (!e.name || !e.type) continue;
+    entities.push({
+      name: e.name as string,
+      type: e.type as string,
+      description: (e.description as string | undefined) ?? undefined,
+      sourceBlockId: blockIds[0],
+      sourceText: (e.source_text as string | undefined) ?? "",
+    });
   }
+  return entities;
 }
 
 function deduplicate(entities: ExtractedEntity[]): ExtractedEntity[] {

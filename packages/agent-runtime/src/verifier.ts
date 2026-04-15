@@ -1,5 +1,5 @@
 import type { LLMClient } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 
 export const VERIFIER_SYSTEM_PROMPT = `You are a verification agent for InsightGraph. Your job is to verify an analysis by checking:
 
@@ -69,16 +69,28 @@ export class Verifier {
         ],
         0.0,
       );
-      const parsed = JSON.parse(raw);
+      const parsed = safeParseLlmJson<Record<string, unknown>>(raw, {
+        context: "verifier",
+        validate: isRecord,
+      });
+      if (!parsed) {
+        return {
+          verified: false,
+          issues: ["Verifier response was not valid JSON"],
+          adjustedConfidence: 0.0,
+          evidenceCoverage: 0.0,
+          notes: "Verification unavailable",
+        };
+      }
       return {
-        verified: parsed.verified ?? false,
-        issues: parsed.issues ?? [],
-        adjustedConfidence: parsed.adjusted_confidence ?? 0.0,
-        evidenceCoverage: parsed.evidence_coverage ?? 0.0,
-        notes: parsed.notes ?? "",
+        verified: (parsed.verified as boolean) ?? false,
+        issues: (parsed.issues as string[]) ?? [],
+        adjustedConfidence: (parsed.adjusted_confidence as number) ?? 0.0,
+        evidenceCoverage: (parsed.evidence_coverage as number) ?? 0.0,
+        notes: (parsed.notes as string) ?? "",
       };
-    } catch {
-      console.warn("Verifier failed");
+    } catch (err) {
+      console.warn(`[verifier] chat failed: ${(err as Error).message}`);
       return {
         verified: false,
         issues: ["Verification failed due to an error"],
