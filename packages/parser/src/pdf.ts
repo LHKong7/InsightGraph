@@ -171,8 +171,15 @@ export class PdfParser implements BaseParser {
       const lines: Map<number, string[]> = new Map();
       for (const item of textContent.items) {
         if (!("str" in item) || !item.str.trim()) continue;
-        // Round y to nearest integer to group items on the same line
-        const y = Math.round((item as any).transform?.[5] ?? 0);
+        // Round y to nearest integer to group items on the same line.
+        // pdf.js types `transform` as `number[]`, but some items (notably
+        // marked-content hints) don't include it — guard with isArray.
+        const transform = (item as { transform?: unknown }).transform;
+        const rawY =
+          Array.isArray(transform) && typeof transform[5] === "number"
+            ? transform[5]
+            : 0;
+        const y = Math.round(rawY);
         if (!lines.has(y)) {
           lines.set(y, []);
         }

@@ -77,6 +77,12 @@ export class Orchestrator {
     const analysis = await this.analyst.analyze(question, resultsAsRecords);
 
     // Step 4: Verify
+    //
+    // NOTE: These could *not* safely be parallelized with the Analyst — the
+    // Verifier's prompt inspects the Analyst's findings/citations and asserts
+    // they're supported by the retrieval. Calling them concurrently with an
+    // empty analysis object silently degrades verification quality to "always
+    // verified", which is worse than a few hundred ms of latency.
     console.info("Verifying analysis");
     const verification = await this.verifier.verify(
       analysis as unknown as Record<string, unknown>,

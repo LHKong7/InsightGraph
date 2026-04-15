@@ -10,11 +10,8 @@ import type {
   Settings,
   DomainConfig,
 } from "@insightgraph/core";
-import {
-  Neo4jConnection,
-  ensureSchema,
-  GraphReader,
-} from "@insightgraph/graph";
+import { createGraphStore } from "@insightgraph/graph";
+import type { GraphStore, IGraphReader } from "@insightgraph/graph";
 import {
   GraphRetriever,
   AgentTools,
@@ -50,6 +47,10 @@ const SUPPORTED_EXTENSIONS = new Set([
  * directly from an Electron main process, a Node.js server, or any other
  * in-process consumer. No HTTP, no child process.
  *
+ * Backend is selected by `config.graphBackend` (or the `IG_GRAPH_BACKEND` env
+ * var) and may be one of `neo4j` (default), `sqlite`, or `falkor`. The
+ * underlying `GraphStore` is created via `createGraphStore(settings)`.
+ *
  * @example
  * ```ts
  * const ig = new InsightGraph({
@@ -67,8 +68,8 @@ const SUPPORTED_EXTENSIONS = new Set([
 export class InsightGraph extends EventEmitter {
   private _settings: Settings;
   private _domainConfig: DomainConfig;
-  private _neo4j: Neo4jConnection | null = null;
-  private _reader: GraphReader | null = null;
+  private _store: GraphStore | null = null;
+  private _reader: IGraphReader | null = null;
   private _sessionManager: SessionManager | null = null;
 
   constructor(config: SdkConfig = {}) {
@@ -90,32 +91,34 @@ export class InsightGraph extends EventEmitter {
     return this._domainConfig;
   }
 
+  /** The active graph backend (`neo4j` / `sqlite` / `falkor`). */
+  get backend(): string | null {
+    return this._store?.kind ?? null;
+  }
+
   /**
-   * Connect to Neo4j, ensure the graph schema, and warm internal helpers.
-   * Call once at startup before any other method.
+   * Open the graph store (connects Neo4j / opens SQLite / boots FalkorDB),
+   * ensures the schema, and warms internal helpers. Idempotent — call once
+   * at startup.
    */
   async initialize(): Promise<void> {
-    if (this._neo4j) return; // idempotent
+    if (this._store) return; // idempotent
 
-    const conn = new Neo4jConnection(
-      this._settings.neo4jUri,
-      this._settings.neo4jUser,
-      this._settings.neo4jPassword,
-    );
+    const store = createGraphStore(this._settings);
 
     try {
-      await conn.verifyConnectivity();
+      await store.verifyConnectivity();
     } catch (err) {
-      // Don't throw — the connection may still work for queries even if
-      // verifyConnectivity() reports stale auth. Surface a warning to the caller.
+      // Don't throw — the store may still work for queries even if
+      // verifyConnectivity() reports a transient failure.
       this.emit(
         "warning",
-        `Neo4j connectivity check failed: ${(err as Error).message}`,
+        `Graph connectivity check failed (${store.kind}): ${(err as Error).message}`,
       );
     }
 
     try {
-      await ensureSchema(conn);
+      await store.ensureSchema();
     } catch (err) {
       this.emit(
         "warning",
@@ -123,16 +126,16 @@ export class InsightGraph extends EventEmitter {
       );
     }
 
-    this._neo4j = conn;
-    this._reader = new GraphReader(conn);
+    this._store = store;
+    this._reader = store.reader();
     this._sessionManager = new SessionManager();
   }
 
-  /** Close the Neo4j driver. Call once at shutdown. */
+  /** Close the graph store. Call once at shutdown. */
   async close(): Promise<void> {
-    if (this._neo4j) {
-      await this._neo4j.close();
-      this._neo4j = null;
+    if (this._store) {
+      await this._store.close();
+      this._store = null;
       this._reader = null;
     }
   }
@@ -160,7 +163,7 @@ export class InsightGraph extends EventEmitter {
     try {
       const result = await runPipeline(stagedPath, reportId, this._settings, {
         emit,
-        neo4j: this._neo4j!,
+        store: this._store!,
         domainConfig: this._domainConfig,
       });
       return { reportId, ...result };
@@ -173,6 +176,7 @@ export class InsightGraph extends EventEmitter {
 
   private async _stageFile(opts: IngestOptions, reportId: string): Promise<string> {
     const filename = "filename" in opts && opts.filename ? opts.filename : undefined;
+    const maxBytes = this._settings.maxFileSizeMb * 1024 * 1024;
 
     if ("filePath" in opts) {
       const ext = extname(filename ?? opts.filePath).toLowerCase();
@@ -187,6 +191,18 @@ export class InsightGraph extends EventEmitter {
     if (!SUPPORTED_EXTENSIONS.has(ext)) {
       throw new Error(`Unsupported file extension: ${ext}`);
     }
+
+    // Enforce size limit BEFORE allocating a fresh Buffer, to avoid OOM on
+    // pathological inputs. Buffer.byteLength avoids copying.
+    const inputSize = opts.buffer instanceof Buffer
+      ? opts.buffer.byteLength
+      : opts.buffer.byteLength;
+    if (inputSize > maxBytes) {
+      throw new Error(
+        `File too large: ${Math.round(inputSize / 1024 / 1024)} MB exceeds limit of ${this._settings.maxFileSizeMb} MB`,
+      );
+    }
+
     const uploadDir = this._settings.uploadDir;
     if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
     const stagedPath = join(uploadDir, `${reportId}${ext}`);
@@ -334,7 +350,7 @@ export class InsightGraph extends EventEmitter {
   // --------------------------------------------------------------------
 
   private _assertReady(): void {
-    if (!this._neo4j || !this._reader) {
+    if (!this._store || !this._reader) {
       throw new Error(
         "InsightGraph has not been initialized — call `await ig.initialize()` first.",
       );

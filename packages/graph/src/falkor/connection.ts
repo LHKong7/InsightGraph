@@ -1,7 +1,21 @@
-import { mkdirSync } from "fs";
-import { resolve } from "path";
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
+import { join, resolve } from "path";
 import type { Graph } from "falkordb";
 import { FalkorDB, type FalkorDBLiteOptions } from "falkordblite";
+
+/**
+ * Return true if a process with the given PID is alive. Uses `process.kill(pid, 0)`
+ * which sends no signal but throws ESRCH when the target doesn't exist.
+ */
+function pidIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EPERM") return true;
+    return false;
+  }
+}
 
 /**
  * FalkorDB's QueryParam type is a recursive union of primitives + arrays +
@@ -38,6 +52,7 @@ export class FalkorConnection {
   readonly graphName: string;
   private db: FalkorDB | null = null;
   private _graph: Graph | null = null;
+  private _lockFile: string | null = null;
 
   constructor(
     private readonly dbPath: string | undefined,
@@ -50,6 +65,10 @@ export class FalkorConnection {
   /**
    * Open the embedded server and select the configured graph. Idempotent —
    * repeated calls reuse the existing connection.
+   *
+   * Acquires a PID-based lock file at `{dbPath}/LOCK` so two processes can't
+   * silently collide on the same FalkorDB data directory (which would fight
+   * over the embedded redis-server socket and corrupt the RDB/AOF).
    */
   async open(): Promise<void> {
     if (this.db) return;
@@ -61,10 +80,44 @@ export class FalkorConnection {
       } catch {
         // ignore — already exists
       }
+      this._acquireLock(absolute);
       opts.path = absolute;
     }
     this.db = await FalkorDB.open(opts);
     this._graph = this.db.selectGraph(this.graphName);
+  }
+
+  private _acquireLock(dir: string) {
+    const lockPath = join(dir, "LOCK");
+    if (existsSync(lockPath)) {
+      const raw = readFileSync(lockPath, "utf8").trim();
+      const existingPid = Number.parseInt(raw, 10);
+      if (Number.isFinite(existingPid) && pidIsAlive(existingPid)) {
+        throw new Error(
+          `FalkorDB path ${dir} is already in use by PID ${existingPid}. ` +
+            `Either close the other process or use a different IG_FALKOR_PATH. ` +
+            `If you're certain no other process is running, delete ${lockPath}.`,
+        );
+      }
+      // Stale lock — previous process crashed without cleanup. Claim it.
+    }
+    writeFileSync(lockPath, String(process.pid));
+    this._lockFile = lockPath;
+  }
+
+  private _releaseLock() {
+    if (!this._lockFile) return;
+    try {
+      // Only remove if it's still ours — avoid clobbering another process
+      // that may have reused the path after our `close()`.
+      const raw = readFileSync(this._lockFile, "utf8").trim();
+      if (Number.parseInt(raw, 10) === process.pid) {
+        unlinkSync(this._lockFile);
+      }
+    } catch {
+      // best effort
+    }
+    this._lockFile = null;
   }
 
   /**
@@ -126,5 +179,6 @@ export class FalkorConnection {
       this.db = null;
       this._graph = null;
     }
+    this._releaseLock();
   }
 }

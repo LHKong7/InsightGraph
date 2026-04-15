@@ -69,7 +69,26 @@ export {
   EntityResolver,
 } from "@insightgraph/resolver";
 
-// Graph
+// Graph — backend-agnostic primitives (preferred for new code)
+export {
+  createGraphStore,
+  Neo4jGraphStore,
+  SqliteGraphStore,
+  FalkorGraphStore,
+  DEFAULT_MERGE_POLICY,
+  UnsupportedBackendError,
+} from "@insightgraph/graph";
+export type {
+  GraphStore,
+  IGraphReader,
+  IGraphWriter,
+  GraphBackend,
+  GraphDumpChunk,
+  ImportStats,
+  MergePolicy,
+} from "@insightgraph/graph";
+
+// Graph — Neo4j-specific primitives (legacy; still exported for one release)
 export {
   Neo4jConnection,
   ensureSchema,

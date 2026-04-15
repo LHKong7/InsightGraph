@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useRef, useEffect, useState } from "react";
-import type { GraphData, GraphNode, GraphLink } from "@/types";
+import type { GraphData, GraphNode } from "@/types";
 
-// Dynamic import since react-force-graph-2d requires browser APIs
-let ForceGraph2D: any = null;
+// react-force-graph-2d is browser-only — loaded via dynamic import in useEffect
+// below. We intentionally don't keep a module-level handle; the component
+// holds it in its `FG` state.
 
 const NODE_COLORS: Record<string, string> = {
   Entity: "#3b82f6",

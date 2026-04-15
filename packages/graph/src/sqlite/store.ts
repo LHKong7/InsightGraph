@@ -24,6 +24,12 @@ const TYPED_NODE_LABELS: Array<{ label: string; idKey: string; table: string }> 
 ];
 
 /**
+ * Whitelist of valid table names, used to guard any `SELECT * FROM ${table}`
+ * pattern against future refactors that might funnel user input into it.
+ */
+const TYPED_TABLE_SET = new Set(TYPED_NODE_LABELS.map((t) => t.table));
+
+/**
  * SQLite-backed GraphStore. Opens a single database file via better-sqlite3
  * (sync driver wrapped in Promise.resolve on the async boundary to match the
  * GraphStore interface).
@@ -60,6 +66,12 @@ export class SqliteGraphStore implements GraphStore {
   async *exportDump(): AsyncIterable<GraphDumpChunk> {
     const db = this.conn.raw();
     for (const { label, idKey, table } of TYPED_NODE_LABELS) {
+      // Defensive: every table in TYPED_NODE_LABELS is hard-coded, but if a
+      // future refactor ever derives `table` from user input, we would be
+      // wide open to SQL injection via `SELECT * FROM ${table}`. Fail loud.
+      if (!TYPED_TABLE_SET.has(table)) {
+        throw new Error(`[sqlite-store] refusing to query unknown table: ${table}`);
+      }
       const rows = db.prepare(`SELECT * FROM ${table}`).all() as Record<
         string,
         unknown

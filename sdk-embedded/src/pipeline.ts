@@ -3,18 +3,27 @@ import { loadDomainConfig } from "@insightgraph/core";
 import { ParserService } from "@insightgraph/parser";
 import { ExtractionPipeline } from "@insightgraph/extractor";
 import { ResolverService } from "@insightgraph/resolver";
-import { Neo4jConnection, GraphWriter } from "@insightgraph/graph";
+import {
+  createGraphStore,
+  Neo4jConnection,
+  Neo4jGraphStore,
+} from "@insightgraph/graph";
+import type { GraphStore } from "@insightgraph/graph";
 import type { ProgressEvent } from "./types";
 
 /**
- * Run the full ingestion pipeline against a staged file and write the graph to Neo4j.
+ * Run the full ingestion pipeline against a staged file and write the graph.
  *
  * This is a pure library function — no child-process spawn, no HTTP. Callers can
  * consume the returned promise and/or observe stage transitions via `emit`.
  *
- * Accepts an optional `neo4j` connection so long-lived consumers can reuse a single
- * driver across many ingestions (e.g. the {@link InsightGraph} facade). When omitted,
- * a temporary connection is opened and closed for this call.
+ * Pass an already-opened {@link GraphStore} via `options.store` to reuse one
+ * connection across many ingestions (e.g. the {@link InsightGraph} facade).
+ * Without it, the pipeline opens a short-lived store derived from `settings.graphBackend`
+ * and closes it when the call finishes.
+ *
+ * The legacy `options.neo4j` parameter is preserved for one release — pass a
+ * `Neo4jConnection` to opt into Neo4j specifically.
  */
 export async function runPipeline(
   stagedPath: string,
@@ -22,6 +31,9 @@ export async function runPipeline(
   settings: Settings,
   options: {
     emit?: (ev: ProgressEvent) => void;
+    /** Re-use an open GraphStore (any backend). */
+    store?: GraphStore;
+    /** @deprecated use `store` instead. Legacy Neo4j connection override. */
     neo4j?: Neo4jConnection;
     domainConfig?: DomainConfig;
   } = {},
@@ -75,24 +87,39 @@ export async function runPipeline(
   );
   extractions = await resolver.resolve(extractions);
 
-  // 4. Write to Neo4j
+  // 4. Write to the graph
   emit({ stage: "writing", reportId });
 
-  const ownConnection = !options.neo4j;
-  const conn = options.neo4j ?? new Neo4jConnection(
-    settings.neo4jUri,
-    settings.neo4jUser,
-    settings.neo4jPassword,
-  );
+  // Resolve a GraphStore in priority order:
+  //   1. options.store     — user passed an open store (reused across calls)
+  //   2. options.neo4j     — legacy Neo4j-only override, wrap in Neo4jGraphStore
+  //   3. settings          — create a short-lived store matching graphBackend
+  let store: GraphStore;
+  let ownsStore = false;
+  if (options.store) {
+    store = options.store;
+  } else if (options.neo4j) {
+    // Legacy path: wrap the provided connection in a Neo4jGraphStore so the
+    // writer interface is consistent. Caller still owns the raw connection.
+    store = new Neo4jGraphStore(
+      settings.neo4jUri,
+      settings.neo4jUser,
+      settings.neo4jPassword,
+    );
+    ownsStore = true;
+  } else {
+    store = createGraphStore(settings);
+    ownsStore = true;
+  }
 
   try {
-    const writer = new GraphWriter(conn);
+    const writer = store.writer();
     const result = await writer.writeDocument(doc, extractions);
     emit({ stage: "completed", reportId, ...result });
     return result as Awaited<ReturnType<typeof runPipeline>>;
   } finally {
-    if (ownConnection) {
-      await conn.close();
+    if (ownsStore) {
+      await store.close();
     }
   }
 }
