@@ -24,6 +24,16 @@ export interface Settings {
   extractionBatchSize: number;
   extractionMaxConcurrency: number;
   domain: string;
+  /**
+   * Allowed CORS origins for the API. Empty array means "deny all cross-origin".
+   * Use ["*"] to explicitly allow any origin (dev only).
+   */
+  corsOrigins: string[];
+  /**
+   * When true, the API returns generic error messages to clients and logs the
+   * detailed message server-side. Defaults to true unless `IG_ENV` is "development".
+   */
+  safeErrorResponses: boolean;
 }
 
 function envStr(key: string, defaultValue: string): string {
@@ -35,6 +45,18 @@ function envInt(key: string, defaultValue: number): number {
   if (raw === undefined) return defaultValue;
   const parsed = parseInt(raw, 10);
   return Number.isNaN(parsed) ? defaultValue : parsed;
+}
+
+function envList(key: string, defaultValue: string[]): string[] {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === "") return defaultValue;
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function envBool(key: string, defaultValue: boolean): boolean {
+  const raw = process.env[key];
+  if (raw === undefined) return defaultValue;
+  return /^(1|true|yes|on)$/i.test(raw);
 }
 
 /** Build a Settings object from env vars (no cache). */
@@ -63,6 +85,11 @@ function envDefaults(): Settings {
     extractionBatchSize: envInt("IG_EXTRACTION_BATCH_SIZE", 5),
     extractionMaxConcurrency: envInt("IG_EXTRACTION_MAX_CONCURRENCY", 5),
     domain: envStr("IG_DOMAIN", "default"),
+    corsOrigins: envList("IG_CORS_ORIGINS", ["http://localhost:3000"]),
+    safeErrorResponses: envBool(
+      "IG_SAFE_ERROR_RESPONSES",
+      (process.env.IG_ENV ?? "production").toLowerCase() !== "development",
+    ),
   };
 }
 

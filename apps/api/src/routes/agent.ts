@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppState } from "../app";
+import { parseUuidParam } from "../lib/validators";
 
 export const agentRoutes = new Hono<AppState>();
 
@@ -26,6 +27,14 @@ agentRoutes.post("/agent/query", async (c) => {
 
   if (!settings.llmApiKey) {
     return c.json({ error: "LLM API key required" }, 400);
+  }
+  if (!settings.llmModel) {
+    return c.json({ error: "LLM model not configured (IG_LLM_MODEL)" }, 503);
+  }
+  if (body.session_id !== undefined) {
+    // Session IDs are UUIDs issued by POST /sessions. Reject anything else
+    // rather than letting arbitrary strings pollute session storage.
+    parseUuidParam("session_id", body.session_id);
   }
 
   const { Orchestrator } = await import("@insightgraph/agent-runtime");
@@ -57,8 +66,9 @@ agentRoutes.post("/sessions", async (c) => {
 });
 
 agentRoutes.get("/sessions/:sessionId", async (c) => {
+  const sessionId = parseUuidParam("sessionId", c.req.param("sessionId"));
   const mgr = await getSessionManager();
-  const session = mgr.getSession(c.req.param("sessionId"));
+  const session = mgr.getSession(sessionId);
   if (!session) return c.json({ error: "Session not found" }, 404);
   return c.json({
     session_id: session.sessionId,
@@ -69,8 +79,9 @@ agentRoutes.get("/sessions/:sessionId", async (c) => {
 });
 
 agentRoutes.delete("/sessions/:sessionId", async (c) => {
+  const sessionId = parseUuidParam("sessionId", c.req.param("sessionId"));
   const mgr = await getSessionManager();
-  mgr.deleteSession(c.req.param("sessionId"));
+  mgr.deleteSession(sessionId);
   return c.json({ deleted: true });
 });
 
