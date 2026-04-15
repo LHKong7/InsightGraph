@@ -5,7 +5,14 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    // Don't surface the raw response body to the UI — server errors can leak
+    // stack traces, internal paths, or env values. Log the detail to the
+    // browser console for debugging, and throw a generic status-only error.
+    const body = await res.text().catch(() => "");
+    if (body) console.error(`API ${res.status} ${path}:`, body);
+    throw new Error(`API ${res.status}`);
+  }
   return res.json();
 }
 
@@ -100,7 +107,11 @@ export async function uploadReport(file: File) {
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (body) console.error(`Upload ${res.status}:`, body);
+    throw new Error(`Upload failed: ${res.status}`);
+  }
   return res.json();
 }
 
