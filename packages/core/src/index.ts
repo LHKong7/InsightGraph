@@ -76,3 +76,5 @@ export type {
 // LLM
 export { createLLMClient, chatJSON } from "./llm";
 export type { LLMClient, ChatCompletionMessageParam } from "./llm";
+export { safeParseLlmJson, isRecord } from "./llm-json";
+export type { SafeParseOptions } from "./llm-json";

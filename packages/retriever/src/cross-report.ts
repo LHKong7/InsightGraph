@@ -1,4 +1,4 @@
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 import type { IGraphReader } from "@insightgraph/graph";
 import type { LLMClient } from "@insightgraph/core";
 
@@ -134,15 +134,25 @@ export class CrossReportAnalyzer {
       ],
       0,
     );
-    const data = JSON.parse(raw) as {
-      contradictions?: Array<{ claim_a?: number; claim_b?: number; explanation?: string }>;
-    };
+    const data = safeParseLlmJson<{
+      contradictions?: Array<{
+        claim_a?: number;
+        claim_b?: number;
+        explanation?: string;
+      }>;
+    }>(raw, { context: "cross-report.contradictions", validate: isRecord });
+    if (!data) return [];
 
     const results: Record<string, unknown>[] = [];
     for (const c of data.contradictions ?? []) {
-      const idxA = (c.claim_a ?? 1) - 1;
-      const idxB = (c.claim_b ?? 2) - 1;
-      if (idxA >= 0 && idxA < claimTexts.length && idxB >= 0 && idxB < claimTexts.length) {
+      // Require both claim indices to be present & valid — don't silently
+      // fall back to 0/1, which would fabricate a contradiction.
+      if (typeof c.claim_a !== "number" || typeof c.claim_b !== "number") {
+        continue;
+      }
+      const idxA = c.claim_a - 1;
+      const idxB = c.claim_b - 1;
+      if (idxA >= 0 && idxA < claimTexts.length && idxB >= 0 && idxB < claimTexts.length && idxA !== idxB) {
         results.push({
           claim_a: claimTexts[idxA],
           claim_b: claimTexts[idxB],

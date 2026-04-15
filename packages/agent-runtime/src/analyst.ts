@@ -1,5 +1,5 @@
 import type { LLMClient } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 
 export const ANALYST_SYSTEM_PROMPT = `You are an analyst for InsightGraph. Given retrieved data from a knowledge graph, synthesize a clear, evidence-backed answer.
 
@@ -63,16 +63,29 @@ export class Analyst {
         ],
         0.1,
       );
-      const parsed = JSON.parse(raw);
+      const parsed = safeParseLlmJson<Record<string, unknown>>(raw, {
+        context: "analyst",
+        validate: isRecord,
+      });
+      if (!parsed) {
+        return {
+          answer: "Unable to generate analysis from the available data.",
+          keyFindings: [],
+          evidenceUsed: [],
+          confidence: 0.0,
+          gaps: ["Analysis response was not valid JSON"],
+        };
+      }
       return {
-        answer: parsed.answer ?? "No answer available.",
-        keyFindings: parsed.key_findings ?? [],
-        evidenceUsed: parsed.evidence_used ?? [],
-        confidence: parsed.confidence ?? 0.0,
-        gaps: parsed.gaps ?? [],
+        answer: (parsed.answer as string) ?? "No answer available.",
+        keyFindings: (parsed.key_findings as string[]) ?? [],
+        evidenceUsed:
+          (parsed.evidence_used as Array<Record<string, unknown>>) ?? [],
+        confidence: (parsed.confidence as number) ?? 0.0,
+        gaps: (parsed.gaps as string[]) ?? [],
       };
-    } catch {
-      console.warn("Analyst failed");
+    } catch (err) {
+      console.warn(`[analyst] chat failed: ${(err as Error).message}`);
       return {
         answer: "Unable to generate analysis from the available data.",
         keyFindings: [],

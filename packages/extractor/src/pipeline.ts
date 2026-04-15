@@ -59,15 +59,29 @@ export class ExtractionPipeline {
     console.log(`[pipeline] Starting extraction: ${textBlocks.length} blocks`);
 
     // Phase 1: entities + metrics + claims run in parallel. Each extractor
-    // manages its own concurrency internally; the outer Promise.all lets
-    // their LLM calls interleave so idle RTT on one category is backfilled
-    // by work on the others.
+    // manages its own concurrency internally; the outer Promise.allSettled
+    // lets their LLM calls interleave so idle RTT on one category is
+    // backfilled by work on the others, and — critically — a failure in one
+    // category does NOT discard the successful output of the others.
     const phase1Start = Date.now();
-    const [entities, metrics, claims] = await Promise.all([
+    const [entitiesRes, metricsRes, claimsRes] = await Promise.allSettled([
       this.entityExtractor.extract(textBlocks, context),
       this.metricExtractor.extract(textBlocks, context),
       this.claimExtractor.extract(textBlocks, context),
     ]);
+    const pickOr = <T>(
+      res: PromiseSettledResult<T[]>,
+      label: string,
+    ): T[] => {
+      if (res.status === "fulfilled") return res.value;
+      console.warn(
+        `[pipeline] ${label} extraction rejected: ${(res.reason as Error)?.message ?? res.reason}`,
+      );
+      return [];
+    };
+    const entities = pickOr(entitiesRes, "entity");
+    const metrics = pickOr(metricsRes, "metric");
+    const claims = pickOr(claimsRes, "claim");
     console.log(
       `[pipeline] Phase 1 done in ${Date.now() - phase1Start}ms: ` +
         `${entities.length} entities, ${metrics.length} metrics, ${claims.length} claims`,

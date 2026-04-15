@@ -1,5 +1,5 @@
 import type { Block, ExtractedClaim, ClaimType } from "@insightgraph/core";
-import { createLLMClient, chatJSON, CLAIM_TYPES } from "@insightgraph/core";
+import { createLLMClient, chatJSON, CLAIM_TYPES, safeParseLlmJson, isRecord } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { CLAIM_SYSTEM_PROMPT, formatClaimPrompt } from "./prompts/claim";
 import { createLimiter } from "./concurrency";
@@ -61,7 +61,8 @@ export class ClaimExtractor {
         { role: "user", content: formatClaimPrompt(combinedText, docTitle, sectionTitle) },
       ]);
       return parseClaims(raw, blockIds);
-    } catch {
+    } catch (err) {
+      console.warn(`[claim-extractor] LLM call failed: ${(err as Error).message}`);
       return [];
     }
   }
@@ -73,24 +74,26 @@ function parseClaimType(raw: string): ClaimType {
 }
 
 function parseClaims(rawJson: string, blockIds: string[]): ExtractedClaim[] {
-  try {
-    const data = JSON.parse(rawJson);
-    const claims: ExtractedClaim[] = [];
-    for (const c of data.claims ?? []) {
-      if (!c.text) continue;
-      claims.push({
-        text: c.text,
-        type: parseClaimType(c.type ?? "FACTUAL"),
-        entitiesMentioned: c.entities_mentioned ?? [],
-        confidence: typeof c.confidence === "number" ? c.confidence : 1.0,
-        sourceBlockId: blockIds[0],
-        sourceText: c.source_text ?? "",
-      });
-    }
-    return claims;
-  } catch {
-    return [];
+  if (blockIds.length === 0) return [];
+  const data = safeParseLlmJson<{ claims?: Array<Record<string, unknown>> }>(
+    rawJson,
+    { context: "claim-extractor", validate: isRecord },
+  );
+  if (!data) return [];
+
+  const claims: ExtractedClaim[] = [];
+  for (const c of data.claims ?? []) {
+    if (!c.text) continue;
+    claims.push({
+      text: c.text as string,
+      type: parseClaimType((c.type as string | undefined) ?? "FACTUAL"),
+      entitiesMentioned: (c.entities_mentioned as string[]) ?? [],
+      confidence: typeof c.confidence === "number" ? c.confidence : 1.0,
+      sourceBlockId: blockIds[0],
+      sourceText: (c.source_text as string | undefined) ?? "",
+    });
   }
+  return claims;
 }
 
 function makeBatches<T>(items: T[], size: number): T[][] {

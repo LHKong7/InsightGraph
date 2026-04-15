@@ -1,5 +1,5 @@
 import type { Block, ExtractedRelationship } from "@insightgraph/core";
-import { createLLMClient, chatJSON } from "@insightgraph/core";
+import { createLLMClient, chatJSON, safeParseLlmJson, isRecord } from "@insightgraph/core";
 import type { LLMClient } from "@insightgraph/core";
 import { RELATIONSHIP_SYSTEM_PROMPT, formatRelationshipPrompt } from "./prompts/relationship";
 import { createLimiter } from "./concurrency";
@@ -71,7 +71,8 @@ export class RelationshipExtractor {
         { role: "user", content: formatRelationshipPrompt(combinedText, entityNames, docTitle) },
       ]);
       return parseRelationships(raw, blockIds, entityNamesLower);
-    } catch {
+    } catch (err) {
+      console.warn(`[relationship-extractor] LLM call failed: ${(err as Error).message}`);
       return [];
     }
   }
@@ -82,32 +83,36 @@ function parseRelationships(
   blockIds: string[],
   entityNamesLower: Set<string>,
 ): ExtractedRelationship[] {
-  try {
-    const data = JSON.parse(rawJson);
-    const rels: ExtractedRelationship[] = [];
-    for (const r of data.relationships ?? []) {
-      if (!r.source_entity || !r.target_entity || !r.relationship_type) continue;
-      const relType = r.relationship_type.toUpperCase().replace(/ /g, "_");
-      if (!REL_TYPE_PATTERN.test(relType)) continue;
-      if (
-        !entityNamesLower.has(r.source_entity.toLowerCase()) ||
-        !entityNamesLower.has(r.target_entity.toLowerCase())
-      ) continue;
+  if (blockIds.length === 0) return [];
+  const data = safeParseLlmJson<{
+    relationships?: Array<Record<string, unknown>>;
+  }>(rawJson, { context: "relationship-extractor", validate: isRecord });
+  if (!data) return [];
 
-      rels.push({
-        sourceEntity: r.source_entity,
-        targetEntity: r.target_entity,
-        relationshipType: relType,
-        description: r.description ?? "",
-        confidence: typeof r.confidence === "number" ? r.confidence : 0.8,
-        sourceBlockId: blockIds[0],
-        sourceText: r.source_text ?? "",
-      });
-    }
-    return rels;
-  } catch {
-    return [];
+  const rels: ExtractedRelationship[] = [];
+  for (const r of data.relationships ?? []) {
+    if (!r.source_entity || !r.target_entity || !r.relationship_type) continue;
+    const src = r.source_entity as string;
+    const tgt = r.target_entity as string;
+    const rawType = r.relationship_type as string;
+    const relType = rawType.toUpperCase().replace(/ /g, "_");
+    if (!REL_TYPE_PATTERN.test(relType)) continue;
+    if (
+      !entityNamesLower.has(src.toLowerCase()) ||
+      !entityNamesLower.has(tgt.toLowerCase())
+    ) continue;
+
+    rels.push({
+      sourceEntity: src,
+      targetEntity: tgt,
+      relationshipType: relType,
+      description: (r.description as string | undefined) ?? "",
+      confidence: typeof r.confidence === "number" ? r.confidence : 0.8,
+      sourceBlockId: blockIds[0],
+      sourceText: (r.source_text as string | undefined) ?? "",
+    });
   }
+  return rels;
 }
 
 function deduplicate(rels: ExtractedRelationship[]): ExtractedRelationship[] {
