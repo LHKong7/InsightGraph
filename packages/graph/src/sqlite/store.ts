@@ -71,8 +71,14 @@ export class SqliteGraphStore implements GraphStore {
         // Parse JSON aliases back to array before emitting.
         if (label === "Entity" && typeof props.aliases === "string") {
           try {
-            props.aliases = JSON.parse(props.aliases as string);
-          } catch {
+            const parsed = JSON.parse(props.aliases as string);
+            props.aliases = Array.isArray(parsed) ? parsed : [];
+          } catch (err) {
+            console.warn(
+              `[sqlite-store] failed to parse aliases for entity ${id}: ${
+                (err as Error).message
+              }. Exporting as empty array.`,
+            );
             props.aliases = [];
           }
         }

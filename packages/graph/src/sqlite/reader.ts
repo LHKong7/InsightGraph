@@ -22,7 +22,9 @@ export class SqliteGraphReader implements IGraphReader {
     entityType?: string,
     limit = 50,
   ): Promise<Record<string, unknown>[]> {
-    const cap = Math.max(1, Math.trunc(limit));
+    // Clamp to a sane range — 1..1000 — so an unvalidated caller can't issue
+    // a `LIMIT -1` or `LIMIT 10000000` query that OOMs the process.
+    const cap = Math.min(Math.max(1, Math.trunc(limit) || 1), 1000);
     if (name) {
       const where = entityType ? " AND e.entity_type = ?" : "";
       const query = `
@@ -312,41 +314,64 @@ export class SqliteGraphReader implements IGraphReader {
       .get(entityB, entityB) as { entity_id: string } | undefined;
     if (!src || !dst) return { nodes: [], edges: [], found: false };
 
-    // BFS in JS — simpler and safer than an unbounded recursive CTE, and more
-    // than fast enough given typical depth ≤ 4.
+    // Level-batched BFS. Previously we issued one `edges` SELECT per visited
+    // node, which is quadratic-ish for deep paths and dense nodes. Instead,
+    // each level collects the whole frontier and runs a single query with
+    // `source_id IN (...) OR target_id IN (...)`, cutting DB round-trips
+    // from O(|V|) to O(d).
     const visited = new Set<string>([src.entity_id]);
     const parent = new Map<string, { from: string; edge: unknown }>();
-    const queue: Array<{ id: string; depth: number }> = [
-      { id: src.entity_id, depth: 0 },
-    ];
-    let found = false;
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      if (cur.id === dst.entity_id) {
-        found = true;
-        break;
-      }
-      if (cur.depth >= d) continue;
-      const neigh = this.db
+    let frontier: string[] = [src.entity_id];
+    let found = visited.has(dst.entity_id);
+    for (let depth = 0; depth < d && !found && frontier.length > 0; depth++) {
+      const placeholders = frontier.map(() => "?").join(",");
+      const edgeRows = this.db
         .prepare(
           `SELECT edge_id, source_id, target_id, type, properties
              FROM edges
-            WHERE source_id = ? OR target_id = ?`,
+            WHERE source_id IN (${placeholders})
+               OR target_id IN (${placeholders})`,
         )
-        .all(cur.id, cur.id) as Record<string, unknown>[];
-      for (const e of neigh) {
-        const other = e.source_id === cur.id ? (e.target_id as string) : (e.source_id as string);
-        if (visited.has(other)) continue;
+        .all(...frontier, ...frontier) as Record<string, unknown>[];
+
+      const frontierSet = new Set(frontier);
+      const nextFrontier: string[] = [];
+      for (const e of edgeRows) {
+        const sId = e.source_id as string;
+        const tId = e.target_id as string;
+        // An edge between two frontier nodes shows up with both endpoints
+        // already visited — we have to pick the endpoint we came *from*.
+        let fromId: string;
+        let other: string;
+        if (frontierSet.has(sId) && !visited.has(tId)) {
+          fromId = sId;
+          other = tId;
+        } else if (frontierSet.has(tId) && !visited.has(sId)) {
+          fromId = tId;
+          other = sId;
+        } else {
+          continue;
+        }
         visited.add(other);
+        let edgeProps: unknown = {};
+        if (e.properties) {
+          try {
+            edgeProps = JSON.parse(e.properties as string);
+          } catch {
+            edgeProps = {};
+          }
+        }
         parent.set(other, {
-          from: cur.id,
-          edge: {
-            type: e.type,
-            props: e.properties ? JSON.parse(e.properties as string) : {},
-          },
+          from: fromId,
+          edge: { type: e.type, props: edgeProps },
         });
-        queue.push({ id: other, depth: cur.depth + 1 });
+        if (other === dst.entity_id) {
+          found = true;
+          break;
+        }
+        nextFrontier.push(other);
       }
+      frontier = nextFrontier;
     }
 
     if (!found) return { nodes: [], edges: [], found: false };
